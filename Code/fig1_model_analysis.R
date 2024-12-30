@@ -8,8 +8,8 @@ library(writexl)
 library(lme4)
 library(lmerTest)
 library(DHARMa)
+library(performance)
 library(flexplot)
-library(outliers)
 library(brglm2)
 
 ### importando os data sets
@@ -18,21 +18,21 @@ library(brglm2)
 model_data_dams <- read_xlsx("Data/Model/MODEL DATA_DAMS.xlsx")
 str(model_data_dams)
 #a variavel Infecção precisa ser categorica
-model_data_dams$Infection <- as.character(model_data_dams$Infection) 
+model_data_dams$Infection <- as.factor(model_data_dams$Infection) 
 str(model_data_dams)
 
 # fetus data set
 model_data_weight <- read_xlsx("Data/Model/MODEL DATA_WEIGHT.xlsx")
 str(model_data_weight)
 #a variavel Infecção precisa ser categorica
-model_data_weight$Infection <- as.character(model_data_weight$Infection)
+model_data_weight$Infection <- as.factor(model_data_weight$Infection)
 str(model_data_weight)
 
 # dams peripheral parasitemia data set
 model_parasitemia <- read_xlsx("Data/Model/MODEL_PARASITEMIA.xlsx")
 str(model_parasitemia)
 #a variavel Infecção precisa ser categorica
-model_parasitemia$Infection <- as.character(model_parasitemia$Infection)
+model_parasitemia$Infection <- as.factor(model_parasitemia$Infection)
 str(model_parasitemia)
 
 
@@ -67,12 +67,14 @@ ggplot(model_parasitemia, aes(x= Preg, y= Parasitemia, fill= Infection))+
 
 
 #modelo glm
-glm_parasitemia <- glm(Parasitemia~Infection*Preg, data = model_parasitemia,
-                       family = "Gamma")
+glm_parasitemia <- glm(Parasitemia~Infection+Preg, data = model_parasitemia,
+                       family = Gamma(link = "identity"))
 
 #diagnóstico do modelo por glm
 residuals_para <- simulateResiduals(fittedModel = glm_parasitemia)
 plot(residuals_para)
+
+check_model(glm_parasitemia)
 
 visualize(glm_parasitemia)
 
@@ -200,9 +202,12 @@ ggplot(model_pb18s_data, aes(x= Infection, y= pb18s, fill= Infection)) +
 glm_pb18s <- glm(pb18s~Infection, data = model_pb18s_data,
                  family = Gamma(link = "log"))
 
+
 #diagnostico do modelo
 residuals_pb18s <- simulateResiduals(fittedModel = glm_pb18s)
 plot(residuals_pb18s)
+
+check_model(glm_pb18s)
 
 visualize(glm_pb18s)
 
@@ -213,7 +218,6 @@ summary(glm_pb18s)
 ######### criando uma tabela com os resultados das analises ################
 
 # requisaitando o pacote
-library(modelsummary)
 library(gtsummary)
 library(kableExtra)
 
