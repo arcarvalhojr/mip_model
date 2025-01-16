@@ -123,7 +123,7 @@ ggplot(comp_percentil_fw, aes(x = Fetal_weight, color = Infection)) +
                                "Infected")) +
   scale_y_continuous(expand = c(0.025,0)) +
   scale_x_continuous(expand = c(0.05, 0)) +
-  geom_vline(data = percentis_5, aes(xintercept = percentil_5), 
+  geom_vline(data = percentil_10, aes(xintercept = percentil_10), 
              linetype = "dashed", linewidth = 0.8) +
   theme_classic() +
   theme(legend.text = element_text(size= 12),
@@ -158,10 +158,10 @@ ggplot(rel_aboun_fw, aes(x= Infection, y= percent, fill= percentil)) +
   scale_fill_manual(name= NULL,
                     breaks = c("below", "under"),
                     values= c("black", "#ffffff"),
-                    labels= c("Below 5th percentil", "Under 5th percentil")) +
+                    labels= c("Below 10th percentil", "Under 10th percentil")) +
   scale_x_discrete(breaks= c("NO", "YES"),
                    labels= c("No", "Yes")) +
-  scale_y_continuous(limits = c(0, 103), breaks = seq(0, 103, by= 20),
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by= 20),
                      expand = c(0,0)) +
   theme_classic() +
   theme(strip.background = element_blank(),
