@@ -1,283 +1,222 @@
-#################################################################
-### processamento e analise dos dados relacionados a figura 1 ###
+######## Exploratory analysis of data related to figure 1 ##########
 
-#pacotes solicitados para as analises
-library(tidyverse)
-library(readxl)
-library(writexl)
-library(lme4)
-library(lmerTest)
-library(DHARMa)
-library(performance)
-library(flexplot)
-library(brglm2)
 
-### importando os data sets
+# import libraries --------------------------------------------------------
+
+library(tidyverse)    # For data manipulation and visualization (ggplot2, dplyr, etc.)
+library(lme4)         # For fitting linear and mixed-effects models
+library(DHARMa)       # For residual diagnostics using simulated residuals
+library(performance)  # For model performance checks (R², outliers, assumptions, etc.)
+library(flexplot)     # For visual diagnostics and exploratory data analysis
+
+
+
+# import clean data -------------------------------------------------------
 
 # dams data set
-model_data_dams <- read_xlsx("Data/Model/MODEL DATA_DAMS.xlsx")
-str(model_data_dams)
-#a variavel Infecção precisa ser categorica
-model_data_dams$Infection <- as.factor(model_data_dams$Infection) 
-str(model_data_dams)
+model_dams <- readRDS("Data/Clean_data/model_dams.rds")
 
 # fetus data set
-model_data_weight <- read_xlsx("Data/Model/MODEL DATA_WEIGHT.xlsx")
-str(model_data_weight)
-#a variavel Infecção precisa ser categorica
-model_data_weight$Infection <- as.factor(model_data_weight$Infection)
-str(model_data_weight)
+model_weights <- readRDS("Data/Clean_data/model_weights.rds")
 
 # dams peripheral parasitemia data set
-model_parasitemia <- read_xlsx("Data/Model/MODEL_PARASITEMIA.xlsx")
-str(model_parasitemia)
-#a variavel Infecção precisa ser categorica
-model_parasitemia$Infection <- as.factor(model_parasitemia$Infection)
-str(model_parasitemia)
+model_parasitemia <- readRDS("Data/Clean_data/model_parasitemia.rds")
 
+# pb18s data set
+model_pb18s <- readRDS("Data/Clean_data/model_pb18s_clean.rds")
 
-#### analise da infecção sobre o peso do baço ############################
+# Analysis of the effect of infection on spleen weight --------------------
 
-# visualizando o dado
-ggplot(model_data_dams, aes(x= Infection, y= Spleen_w, fill= Infection)) +
-  geom_boxplot(outlier.shape = NA, show.legend = FALSE) +
-  geom_jitter(position = position_jitterdodge(jitter.width = 0.8),
-              size= 3, show.legend = FALSE)
+# looking the data
+ggplot(model_dams, aes(x = infection, y = spleen_w, fill = infection)) +
+  geom_boxplot(show.legend = FALSE) 
 
   
-#modelo glm
-glm_sw <- glm(Spleen_w~Infection, data = model_data_dams)
+# glm model
+glm_sw <- glm(spleen_w ~ infection, data = model_dams)
 
-#diagnóstico do modelo por glm
-residuals_sw <- simulateResiduals(fittedModel = glm_sw)
-plot(residuals_sw)
+# model diagnostic
+simulateResiduals(fittedModel = glm_sw, plot = TRUE)
 
-visualize(glm_sw)
+visualize(glm_sw, plot = "residuals")
 
-# estimates
-summary(glm_sw)
-
-#### analise do percentual de parasitemia no sangue periferico ###############
-
-#visualizando o dado
-ggplot(model_parasitemia, aes(x= Preg, y= Parasitemia, fill= Infection))+
-  geom_boxplot(outlier.shape = NA, position = position_dodge(width= 0.8)) +
-  geom_jitter(position = position_jitterdodge(
-    jitter.width = 0.2, dodge.width = 0.8), size= 2.5)
+check_outliers(glm_sw, method = "cook")
 
 
-#modelo glm
-glm_parasitemia <- glm(Parasitemia~Infection+Preg, data = model_parasitemia,
-                       family = Gamma(link = "identity"))
+# Analyse of the effect of pregnancy on susceptibility to infection --------
 
-#diagnóstico do modelo por glm
-residuals_para <- simulateResiduals(fittedModel = glm_parasitemia)
-plot(residuals_para)
+# looking the data
+ggplot(model_parasitemia, aes(x = preg, y = parasitemia, fill = infection))+
+  geom_boxplot()
 
-check_model(glm_parasitemia)
+# glm model
+#it doesn't seem like there's an interaction, but let's check it anyway
 
-visualize(glm_parasitemia)
+glm_parasitemia_1 <- glm(parasitemia ~ infection + preg,
+                         data = model_parasitemia,
+                         family = Gamma(link = "identity"))
 
-# estimates
-summary(glm_parasitemia)
+glm_parasitemia_2 <- glm(parasitemia ~ infection * preg,
+                         data = model_parasitemia,
+                         family = Gamma(link = "identity"))
+
+anova(glm_parasitemia_1, glm_parasitemia_2)
+
+#yep, there's no interaction
+
+# model diagnostic
+simulateResiduals(fittedModel = glm_parasitemia_1, plot = TRUE)
+
+visualize(glm_parasitemia_1, plot = "residuals")
+
+check_outliers(glm_parasitemia_1, method = "cook")
 
 
-#### analise da porcentagem de pre-termo #################################
+# Analyse of infection on fetal weight ------------------------------------
 
-#visualizando o dado
-ggplot(model_data_dams, aes(x= Infection, fill= PTD)) +
-  geom_bar()
-
-#modelo glm
-glm_ptd <- glm(factor(PTD) ~ Infection, data = model_data_dams,
-               family = binomial, method = "brglmFit")
-
-
-# diagnostico do modelo
-residuals_ptd <- simulateResiduals(fittedModel = glm_ptd)
-plot(residuals_ptd)
-
-# estimates
-summary(glm_ptd)
-
-### Analise de peso dos fetos ###########################################
-
-#visualisando o dado
-ggplot(model_data_weight, aes(x= Infection, y= Fetal_weight, fill= Infection)) +
+# looking the data
+ggplot(model_weights, aes(x = infection,y = fetal_weight, fill = infection)) +
   geom_boxplot(show.legend = FALSE)
 
-#modelo lmm
-lmm_fw <- lmer(Fetal_weight~Infection+Litter_size+Placenta_weight+(1|Mice_ID),
-               data= model_data_weight)
+# lmm models
+lmm_fw <- lmer(fetal_weight ~ infection + (1|mice_id), data= model_weights)
 
-#diagnostico do modelo
-residuals_fw <- simulateResiduals(fittedModel = lmm_fw)
-plot(residuals_fw)
+# with litter size
+lmm_fw1 <- lmer(fetal_weight ~ infection + litter_size + (1|mice_id),
+                data = model_weights)
 
-visualize(lmm_fw)
+visualize(lmm_fw1, plot = "model", 
+          formula = fetal_weight ~ litter_size + mice_id | infection,
+          sample = 20)  # looking the model
+#it seems like litter size impact fetal weight
 
-# estimates
-summary(lmm_fw)
+# with placental weight
+lmm_fw2 <- lmer(fetal_weight ~ infection + litter_size + placenta_weight + 
+                  (1|mice_id), data = model_weights)
 
-#verificando outliers
-outs_model_fw <- model_data_weight %>%
-  group_by(Infection) %>%
-  summarise(
-    grubbs_pvalue = grubbs.test(Fetal_weight)$p.value,
-    outlier = ifelse(grubbs_pvalue < 0.05, Fetal_weight[which.max(
-      abs(Fetal_weight - mean(Fetal_weight)))], NA))
-outs_model_fw
+visualize(lmm_fw2, plot = "model", 
+          formula = fetal_weight ~ placenta_weight + mice_id | infection,
+          sample = 20)
+#also seems that pw impact fetal weight
 
-### correlação entre o peso dos fetos e da placenta ######################
+# comparing the fit of the models
+compare_performance(lmm_fw, lmm_fw1, lmm_fw2, rank = TRUE, verbose = FALSE)
 
-#filtrando apenas dois grupos de infecção
-model_cor_pw_fw <- model_data_weight %>%
-  filter(Infection %in% c(0, 8) & Fetal_weight & Placenta_weight) %>%
-  dplyr::select(Mice_ID, Fetus_ID, Infection, Fetal_weight, Placenta_weight)
-str(model_cor_pw_fw)
+# comparing the effect of infection
+lmm_fw_full <- lmer(fetal_weight ~ infection + litter_size + placenta_weight + 
+                      (1|mice_id), data = model_weights)
 
-# Salvando como .xlsx
-write_xlsx(model_cor_pw_fw, "Data/Model/model_cor_pw_fw.xlsx")
+lmm_fw_reduced <- lmer(fetal_weight ~ litter_siz e + placenta_weight +
+                         (1|mice_id), data = model_weights)
 
-# analise de correlação
-cor_test <- model_cor_pw_fw %>%
-  group_by(Infection) %>%
-  summarise(
-    correlation = cor.test(Placenta_weight,
-                           Fetal_weight, method = "spearman")$estimate,
-    p_value = cor.test(Placenta_weight,
-                       Fetal_weight, method = "spearman")$p.value)
+anova(lmm_fw_full, lmm_fw_reduced)
 
-print(cor_test)
+# model diagnostic
+visualize(lmm_fw_full, plot = "residuals")
 
-### analise do racio ####################################################
+simulateResiduals(fittedModel = lmm_fw_full, plot = TRUE)
 
-# visualisandoo dado
-ggplot(model_data_weight, aes(x= Infection, y= FW_PW, fill= Infection)) +
-  geom_boxplot()
+check_outliers(lmm_fw_full, method = "cook")
 
-#modelo lmm
-lmm_ratio <- lmer(FW_PW~Infection+(1|Mice_ID), data= model_data_weight)
 
-#diagnostico do modelo
-residuals_ratio <- simulateResiduals(fittedModel = lmm_ratio)
-plot(residuals_ratio)
+# Analyse of infection on fetal/placental weight ratio --------------------
 
-# estimates
-summary(lmm_ratio)
+# looking the data
+model_weights %>% 
+  filter(!is.na(ratio)) %>% 
+  ggplot(aes(x = infection, y = ratio, fill = infection)) +
+  geom_boxplot(show.legend = FALSE)
 
-### analise da viabilidade fetal #######################################
+# lmm models
+lmm_ratio <- lmer(ratio ~ infection + (1|mice_id), 
+                  data = model_weights)
 
-# visualizando o dado
-ggplot(model_data_weight, aes(x= Infection, fill= Stillbirth)) +
+
+# with litter size
+lmm_ratio1 <- lmer(ratio ~ infection + litter_size + (1|mice_id), 
+                   data = model_weights)
+
+visualize(lmm_ratio1, plot = "model", 
+          formula = ratio ~ litter_size + mice_id | infection,
+          sample = 20)
+
+# comparing the fit of the models
+compare_performance(lmm_ratio, lmm_ratio1,
+                    rank = TRUE, verbose = FALSE)
+
+# comparing the effect of infection
+lmm_ratio_full <- lmer(ratio ~ infection + litter_size + (1|mice_id), 
+                       data = model_weights)
+
+lmm_ratio_reduced <- lmer(ratio ~ litter_size + (1|mice_id), 
+                          data = model_weights)
+
+anova(lmm_ratio_full, lmm_ratio_reduced)
+
+# model diagnostic
+simulateResiduals(fittedModel = lmm_ratio_full, plot = TRUE)
+
+check_outliers(lmm_ratio_full, method = "cook")
+
+#looks bad, deviations detected
+
+# let's try without litter size
+lmm_ratio_2 <- lmer(ratio ~ infection + (1|mice_id), 
+                   data = model_weights)
+
+# model diagnostic
+simulateResiduals(fittedModel = lmm_ratio_2, plot = TRUE)
+
+visualize(lmm_ratio_2, plot = "residuals")
+
+check_outliers(lmm_ratio_2, method = "cook")
+
+#better
+
+
+# Analyse of infection on fetal viability ---------------------------------
+
+# looking the data
+ggplot(model_weights, aes(x = infection, fill = alive)) +
   geom_bar(position = position_dodge(width = 1))
 
-#modelo GLMM
-glm_stb <- glmer(factor(Stillbirth)~Infection+(1|Mice_ID),
-                 data= model_data_weight, family = "binomial")
+# glmm model
+glm_stb <- glmer(factor(alive) ~ infection + (1|mice_id),
+                 data = model_weights, family = "binomial")
 
-#diagnostico do modelo
-residuals_stb <- simulateResiduals(fittedModel = glm_stb)
-plot(residuals_stb)
+# model diagnostic
+simulateResiduals(fittedModel = glm_stb, plot = TRUE)
 
-# estimates
-summary(glm_stb)
 
-### quantificação de pb18s ################################################
+# Analyse of placental pb18s relative expression ---------------------------
 
-#selecionando as variaveis especificas e removendo o grupo n infectado
-model_pb18s_data <- model_data_weight %>%
-  dplyr::select(Fetus_ID, Infection, pb18s) %>%
-  filter(Infection != "0" & !is.na(pb18s))
-str(pb18s_data)
+# looking the data
+ggplot(model_pb18s, aes(x = infection, y = log(pb18s), fill = infection)) +
+  geom_boxplot(show.legend = FALSE)
 
-# Salvando como .xlsx
-write_xlsx(model_pb18s_data, "Data/Model/model_pb18s_data.xlsx")
-
-# visualisando o dado
-ggplot(model_pb18s_data, aes(x= Infection, y= pb18s, fill= Infection)) +
-  geom_boxplot()
-
-#modelo glm
-glm_pb18s <- glm(pb18s~Infection, data = model_pb18s_data,
+# glm model
+glm_pb18s <- glm(pb18s ~ infection, data = model_pb18s,
                  family = Gamma(link = "log"))
 
 
-#diagnostico do modelo
-residuals_pb18s <- simulateResiduals(fittedModel = glm_pb18s)
-plot(residuals_pb18s)
+# model diagnostic
+simulateResiduals(fittedModel = glm_pb18s, plot = TRUE)
 
-check_model(glm_pb18s)
+check_outliers(glm_pb18s, method = "cook")
 
-visualize(glm_pb18s)
+#outlier detected
 
-# estimates
-summary(glm_pb18s)
+# removing outs
+outs_pb18s <- check_outliers(glm_pb18s, method = "cook")
 
+model_pb18s_clean <- model_pb18s %>%
+  slice(-which(outs_pb18s))
 
-######### criando uma tabela com os resultados das analises ################
+# glm model without outs
+glm_pb18s_2 <- glm(pb18s ~ infection, data = model_pb18s_clean,
+                 family = Gamma(link = "log"))
 
-# requisaitando o pacote
-library(gtsummary)
-library(kableExtra)
+simulateResiduals(fittedModel = glm_pb18s_2, plot = TRUE)
 
-# guardando os resultados em uma lista
-models <- list("Spleen weight" = glm_sw,
-               "Fetal weight" = lmm_fw,
-               "Fetal/placental weight ratio" = lmm_ratio,
-               "Pre-term birth" = glm_ptd,
-               "Stillbirth" = glm_stb)
-
-models_parasitemia <- list("Peripheral parasitemia" = glm_parasitemia,
-                           "Pb18s mRNA expression" = glm_pb18s)
-
-# definindo o nome das variaveis
-coef_map <- c("Infection2" = "PbNK65+",
-              "Infection4" = "PbNK65++",
-              "Infection8" = "PbNK65+++",
-              "Litter_size" = "Litter size",
-              "Placenta_weight" = "Placental weight",
-              "(Intercept)" = "Intercept")
-
-
-coef_map_parasitemia <- c()
-
-
-# formatando a tabela com modelsummary
-table_ms <- modelsummary(models,
-             coef_map = coef_map,
-             gof_map = c("nobs"),
-             statistic = "conf.int",
-             stars = TRUE,
-             output = "data.frame")
-
-
-kbl(table_ms, booktabs = TRUE, escape = FALSE) %>%
-  kable_styling(full_width = FALSE, position = "center") %>%
-  add_footnote("CI: Confidence Interval. Stars indicate significance: *** p<0.001, ** p<0.01, * p<0.05", notation = "symbol")
-
-
-
-
-# formatando tabelas com gtsummary
-model_data_dams |>
-  select(Infection, Spleen_w, RBC, HCT, HGB) |>
-  tbl_summary(by = Infection)
-
-# Gerando tabelas de regressão para cada modelo
-tables <- lapply(models, function(model) {
-  tbl_regression(model, exponentiate = FALSE)
-})
-
-# Empilhando as tabelas em uma única tabela
-final_table <- tbl_merge(
-  tbls = tables, # Apenas `tables`, sem envolver com `list()`
-  tab_spanner = names(models) # Nomes das tabelas
-) %>%
-  modify_header(label ~ "**Predictors**") %>%  # Nomes das variáveis em negrito
-  modify_fmt_fun(
-    p.value = function(x) style_pvalue(x, digits = 3, italic = TRUE)  # P-value em itálico
-  ) %>%
-  bold_labels() %>%  # Deixa os rótulos das variáveis em negrito
-  italicize_levels()  # Deixa os níveis dos fatores em itálico
-final_table
+# saving clean data
+#saveRDS(model_pb18s_clean, "Data/Clean_data/model_pb18s_clean.rds")
