@@ -1,53 +1,39 @@
-#################################################################
-### processamento e analise dos dados relacionados a figura 2 ###
+######## Exploratory analysis of data related to figure 2 ##########
 
-#pacotes solicitados para as analises
-library(tidyverse)
-library(readxl)
-library(writexl)
-library(car)
-library(lme4)
-library(lmerTest)
-library(DHARMa)
-library(emmeans)
-library(outliers)
 
-### importando o data set
+# import libraries --------------------------------------------------------
+
+library(tidyverse)  # For data manipulation and visualization (ggplot2, dplyr, etc.)
+library(lme4)       # For fitting linear and mixed-effects models
+library(DHARMa)     # For residual diagnostics using simulated residuals
+
+
+
+# import clean data -------------------------------------------------------
 
 # fetus data set
-model_data_weight <- read_xlsx("Data/Model/MODEL DATA_WEIGHT.xlsx")
-str(model_data_weight)
-#a variavel Infecção precisa ser categorica
-model_data_weight$Infection <- as.character(model_data_weight$Infection)
-str(model_data_weight)
+model_weights <- readRDS("Data/Clean_data/model_weights.rds")
+
+model_percentile_fw <- model_weights %>%
+  mutate(percentile_5 = quantile(fetal_weight[infection == 0],
+                                 probs = 0.05, na.rm = TRUE)) %>%  # getting 5º percentile
+  filter(infection %in% c(0, 8)) %>%
+  select(mice_id, fetus_id, infection, fetal_weight, percentile_5) %>%
+  mutate(percentile = ifelse(fetal_weight >= percentile_5, "under", "below"))  #classification by the 5º percentile  
 
 
-### percentis fetos #######################################################
+# Saving data set
+#saveRDS(model_percentile_fw, "Data/Clean_data/model_percentile_fw.rds")
 
-#filtrando apenas dois grupos de infecção
-model_percentil_fw <- model_data_weight %>%
-  filter(Infection %in% c(0, 8) & Fetal_weight) %>%
-  select(Mice_ID, Fetus_ID, Infection, Fetal_weight)
-str(model_percntil_fw)
 
-#calculando o 5º percentil
-percentil_5 <- quantile(model_percentil_fw$Fetal_weight[
-  model_percentil_fw$Infection == "0"], probs = 0.05)
 
-#Criando uma coluna de classificação (abaixo ou acima do 5º percentil)
-model_percentil_fw <- model_percentil_fw %>% 
-  mutate(percentil = ifelse(Fetal_weight <= percentil_5, "below", "under"))
-str(model_percentil_fw)
+# Analysis of infection on the chances of "fgr" ---------------------------
 
-# Salvando como .xlsx
-write_xlsx(model_percentil_fw, "Data/Model/model_percentil_fw.xlsx")
+# glmm model
+glmm_fw <- glmer(factor(percentile)~infection+(1|mice_id),
+                    data= model_percentile_fw, family = "binomial")
 
-#modelo glmm
-glmm_fw <- glmer(factor(percentil)~Infection+(1|Mice_ID),
-                    data= model_percentil_fw, family = binomial(link = "logit"))
-summary(glmm_fw)
 
-#diagnostico do modelo
-residuals_percentil <- simulateResiduals(fittedModel = glmm_fw)
-plot(residuals_percentil)
+# model diagnostic
+simulateResiduals(fittedModel = glmm_fw, plot = TRUE)
 
