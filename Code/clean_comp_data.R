@@ -36,6 +36,16 @@ comp_ctk_dams <- raw_data_dams %>%
 
 saveRDS(comp_ctk_dams, "Data/Clean_data/comp_ctk_dams.rds")
 
+# comp parasitemia dams
+comp_parasitemia <- read_xlsx("Data/Raw_data/comp_parasitemia.xlsx")
+
+#genotype bntac should be the reference level
+comp_parasitemia$genotype <- factor(comp_parasitemia$genotype,
+                                 levels = c("BNT", "BJ"))
+levels(comp_parasitemia$genotype)
+
+saveRDS(comp_parasitemia, "Data/Clean_data/comp_parasitemia.rds")
+
 # datas related to fetus and placentas ------------------------------------
 raw_data_fetus <- read_xlsx("Data/Raw_data/comp_data_fetus.xlsx")
 glimpse(raw_data_fetus)

@@ -33,6 +33,15 @@ model_ctk_dams <- raw_data_dams %>%
 
 saveRDS(model_ctk_dams, "Data/Clean_data/model_ctk_dams.rds")
 
+# model parasitemia dams
+model_parasitemia <- read_xlsx("Data/Raw_data/model_parasitemia.xlsx")
+glimpse(model_parasitemia)
+
+#infection should be character
+model_parasitemia$infection <- as.character(model_parasitemia$infection)
+
+saveRDS(model_parasitemia, "Data/Clean_data/model_parasitemia.rds")
+
 # datas related to fetus and placentas ------------------------------------
 raw_data_fetus <- read_xlsx("Data/Raw_data/model_data_fetus.xlsx")
 glimpse(raw_data_fetus)
