@@ -52,7 +52,7 @@ glimpse(raw_data_fetus)
 
 # model weights
 model_weights <- raw_data_fetus %>% 
-  select(fetus_id, ini_weight, litter_size, infection, fetal_weight,
+  select(mice_id, fetus_id, ini_weight, litter_size, infection, fetal_weight,
          placenta_weight, ratio)
 
 saveRDS(model_weights, "Data/Clean_data/model_weights.rds")
