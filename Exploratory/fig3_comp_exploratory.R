@@ -1,200 +1,156 @@
-#################################################################
-### processamento e analise dos dados relacionados a figura 3 ###
+######## Exploratory analysis of data related to figure 3 ##########
 
-#pacotes requisitados
-library(tidyverse)
-library(readxl)
-library(rstatix)
-library(DHARMa)
-library(flexplot)
-library(report)
-library(outliers)
+
+# import libraries --------------------------------------------------------
+
+library(tidyverse)    # For data manipulation and visualization (ggplot2, dplyr, etc.)
+library(DHARMa)       # For residual diagnostics using simulated residuals
+library(performance)  # For model performance checks (R², outliers, assumptions, etc.)
+
 
 ### importando os data sets ####
 
+# import clean data -------------------------------------------------------
+
 # dams data set
-comp_data_dams <- read_xlsx("Data/Model_comparison/MODEL DATA_DAMS_COMP.xlsx")
-str(comp_data_dams)
+comp_dams <- readRDS("Data/Clean_data/comp_dams.rds") 
 
-# transformando as variaveis infection e genotype em fatores
-comp_data_dams$Genotype <- as.factor(comp_data_dams$Genotype)
-comp_data_dams$Infection <- as.factor(comp_data_dams$Infection)
-comp_data_dams$PTD <- as.factor(comp_data_dams$PTD)
-
-# o grupo BNTac precisar ser o fator de referencia
-comp_data_dams$Genotype <- relevel(comp_data_dams$Genotype, ref = "BNTac")
-levels(comp_data_dams$Genotype)
+# hematology data set
+comp_hematology <- readRDS("Data/Clean_data/comp_hemato_clean.rds")
 
 # peripheral parasitemia data set
-comp_parasitemia <- read_xlsx("Data/Model_comparison/PARASITEMIA_COMP.xlsx")
-str(comp_parasitemia)
+comp_parasitemia <- readRDS("Data/Clean_data/comp_parasitemia.rds")
 
-# transformando as variaveis genotype E preg em fatores
-comp_parasitemia$Genotype <- as.factor(comp_parasitemia$Genotype)
-comp_parasitemia$Preg <- as.factor(comp_parasitemia$Preg)
+# pb18s data set
+comp_pb18s <- readRDS("Data/Clean_data/comp_pb18s.rds")
 
-#o fator BNTac precisar ser o fator de referencia
-comp_parasitemia$Genotype <- as.factor(comp_parasitemia$Genotype)
-comp_parasitemia$Genotype <- relevel(comp_parasitemia$Genotype, ref = "BNT")
-levels(comp_parasitemia$Genotype)
+# analyse of infection*genotype on rbc ------------------------------------
 
-# fetus data set
-comp_data_weight <- read_xlsx("Data/Model_comparison/MODEL DATA_WEIGHT_COMP.xlsx")
-str(model_data_weight)
-
-# transformando as variaveis infection e genotype em fatores
-comp_data_weight$Genotype <- as.factor(comp_data_weight$Genotype)
-comp_data_weight$Infection <- as.factor(comp_data_weight$Infection)
-
-# o grupo BNTac precisar ser o fator de referencia
-comp_data_weight$Genotype <- relevel(comp_data_weight$Genotype, ref = "BNTac")
-levels(comp_data_weight$Genotype)
-
-
-### analise da infecção*genotipo sobre RBC ###############################
-
-#visualizando o dado
-ggplot(comp_data_dams, aes(x= Infection, y= RBC, fill= Infection))+
+# looking the data
+ggplot(comp_hematology, aes(x = infection, y = rbc, fill = infection))+
   geom_boxplot(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
+  facet_wrap(~ genotype)+
   theme_bw()
 
+# glm model
+glm_rbc <- glm(rbc ~ infection * genotype, data = comp_hematology)
 
-#modelo glm
-glm_rbc <- glm(RBC~Infection*Genotype, data = comp_data_dams)
+# model diagnostic
+simulateResiduals(fittedModel = glm_rbc, plot = TRUE)
 
-#diagnostico do modelo
-residuals_rbc <- simulateResiduals(fittedModel = glm_rbc)
-plot(residuals_rbc)
+check_outliers(glm_rbc, method = "cook")
 
-visualize(glm_rbc)
 
-# estimates
-summary(glm_rbc)
-report(glm_rbc)
+# analyse of infection*genotype on hct ------------------------------------
 
-# multiplas comparações do modelo
-#mtc_rbc <- emmeans(glm_rbc, pairwise~Infection*Genotype)
-#summary(mtc_rbc)
-
-### analise do percentual de hematocrito (HCT) ############################
-
-# visualizando o dado
-ggplot(comp_data_dams, aes(x= Infection, y= HCT, fill= Infection))+
+# looking the data
+ggplot(comp_hematology, aes(x = infection, y = hct, fill = nfection))+
   geom_boxplot(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
+  facet_wrap(~ genotype)+
   theme_bw()
 
-#visualisando a normalidade da variavel
-ggplot(data = comp_data_dams, aes(sample= HCT, color= Infection))+
-  stat_qq()+
-  stat_qq_line(aes(group= Infection), color= "black")+
-  facet_wrap(~Genotype)+
-  theme_bw()
+# glm model
+glm_hct <- glm(hct ~ infection * genotype, data = comp_hematology)
 
-# modelo glm
-glm_hct <- glm(HCT~Infection*Genotype, data = comp_data_dams)
+# model diagnostic
+simulateResiduals(fittedModel = glm_hct, plot = TRUE)
 
-#diagnostico do modelo
-residuals_hct <- simulateResiduals(fittedModel = glm_hct)
-plot(residuals_hct)
+check_outliers(glm_hct, method = "cook")
 
-visualize(glm_hct)
 
-# estimates
-summary(glm_hct)
-report(glm_hct)
+# analyse of infection*genotype on hgb ------------------------------------
 
-#multiplas comparções do modelo
-mtc_hct <- emmeans(glm_hct, pairwise~Infection*Genotype)
-summary(mtc_hct)
-
-### analise da contagem de hemoglobina no sangue (HGB) ###################
-
-# visualizando o dado
-ggplot(comp_data_dams, aes(x= Infection, y= HGB, fill= Infection))+
+# looking the data
+ggplot(comp_hematology, aes(x = infection, y = hgb, fill = infection))+
   geom_boxplot(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
+  facet_wrap(~ genotype)+
   theme_bw()
 
-# moidelo glm
-glm_hgb <- glm(HGB~Infection*Genotype, data = comp_data_dams)
+# glm model
+glm_hgb <- glm(hgb ~ infection * genotype, data = comp_hematology)
 
-#diagnostico do modelo
-residuals_hgb <- simulateResiduals(fittedModel = glm_hgb)
-plot(residuals_hgb)
+# model diagnostic
+simulateResiduals(fittedModel = glm_hgb, plot = TRUE)
 
-visualize(glm_hgb)
+check_outliers(glm_hgb, method = "cook")
 
-# estimates
-summary(glm_hgb)
-report(glm_hgb)
 
-#multiplas comparações para o modelo
-mtc_hgb <- emmeans(glm_hgb, pairwise ~ Infection*Genotype)
-summary(mtc_hgb)
+# analyse of infection*genotype on the chances of ptd ---------------------
 
-### analise da porcentagem de pre-termo ####################################
+# looking the data
+ggplot(comp_dams, aes(x = infection, fill = ptd)) +
+  geom_bar(position = position_dodge()) +
+  facet_wrap(~ genotype) 
 
-# filtrando as variaveis em uma nova tabela
-comp_ptd_data
-
-#calculando o numero de observações por grupo
-n_ptd <- comp_data_dams %>%
-  group_by(Genotype, Infection) %>%
-  count(Infection, PTD)
-n_ptd
-
-#modelo glm
-glm_ptd <- glm(PTD~Infection+Genotype, data = comp_data_dams,
+# glm model
+glm_ptd <- glm(factor(ptd) ~ infection * genotype, data = comp_dams,
                family = "binomial")
 
-#diagnostico do modelo
-residuals_ptd <- simulateResiduals(fittedModel = glm_ptd)
-plot(residuals_ptd)
+# model diagnostic
+simulateResiduals(fittedModel = glm_ptd, plot = TRUE)
 
-# estimates
-summary(glm_ptd)
 
-#multiplas comparações
-mtc_ptd <- emmeans(glm_ptd, pairwise~Infection+Genotype)
-summary(mtc_ptd)
+# analyse of pregnancy*genotype on peripheral parasitemia -----------------
 
-### analise do percentual de parasitemia no sangue periferico #############
-
-# visualizando o dado
-ggplot(comp_parasitemia, aes(x= Genotype, y= Parasitemia, fill= Preg))+
+# looking the data
+ggplot(comp_parasitemia, aes(x = genotype, y = parasitemia, fill = preg))+
   geom_boxplot()
 
-#modelo glm
-glm_parasitemia <- glm(Parasitemia~Preg*Genotype, data = comp_parasitemia)
-summary(glm_parasitemia)
+# glm model
+glm_parasitemia <- glm(parasitemia ~ preg * genotype, data = comp_parasitemia)
 
-#diagnóstico do modelo por glm
-residuals_para <- simulateResiduals(fittedModel = glm_parasitemia)
-plot(residuals_para)
+# model diagnostic
+simulateResiduals(fittedModel = glm_parasitemia, plot = TRUE)
 
-visualize(glm_parasitemia)
+check_outliers(glm_parasitemia, method = "cook")
 
-#multiplas comparações do modelo
-mtc_parasitemia <- emmeans(glm_parasitemia, pairwise~Preg*Genotype)
-summary(mtc_parasitemia)
+# removing outs
+outs_parasitemia <- check_outliers(glm_parasitemia, method = "cook")
 
-### pb18s mRNA expression ########################################
+comp_parasitemia <- comp_parasitemia %>%
+  slice(-which(outs_parasitemia))
 
-#selecionando as variaveis especificas
-pb18s_data <- comp_data_weight %>%
-  select(Genotype, Fetus_ID, Infection, pb18s) %>%
-  filter(Infection == "YES" & !is.na(pb18s))
-str(pb18s_data)
+# glm model without outs
+glm_parasitemia_2 <- glm(parasitemia ~ preg * genotype, data = comp_parasitemia)
 
-#observando o dado
-boxplot(pb18s~Genotype, data= pb18s_data)
+simulateResiduals(fittedModel = glm_parasitemia_2, plot = TRUE)
 
-#modelo glm
-glm_pb18s <- glm(pb18s~Genotype, data = pb18s_data)
-summary(glm_pb18s)
+# saving clean data
+#saveRDS(comp_parasitemia, "Data/Clean_data/comp_parasitemia.rds")
 
-#diagnostico do modelo
-residuals_pb18s <- simulateResiduals(fittedModel = glm_pb18s)
-plot(residuals_pb18s)
+
+# analyse of genotype on placental pb18s ----------------------------------
+
+# looking the data
+ggplot(comp_pb18s, aes(x = genotype, y = log(pb18s), fill = genotype)) +
+  geom_boxplot() +
+  theme_bw()
+
+# glm model
+glm_pb18s <- glm(pb18s ~ genotype, family = Gamma(link = "log"),
+                 data = comp_pb18s)
+
+# model diagnostic
+simulateResiduals(fittedModel = glm_pb18s, plot = TRUE)
+
+check_outliers(glm_pb18s, method = "cook")
+
+# removing outs
+outs_pb18s <- check_outliers(glm_pb18s, method = "cook")
+
+comp_pb18s <- comp_pb18s %>%
+  slice(-which(outs_pb18s))
+
+# looking the data without outs
+ggplot(comp_pb18s, aes(x = genotype, y = log(pb18s), fill = genotype)) +
+  geom_boxplot() +
+  theme_bw()
+
+# glm model without outs
+glm_pb18s_2 <- glm(pb18s ~ genotype, family = Gamma(link = "log"),
+                         data = comp_pb18s)
+
+simulateResiduals(fittedModel = glm_pb18s_2, plot = TRUE)
+
+# saving clean data
+#saveRDS(comp_pb18s, "Data/Clean_data/comp_pb18s.rds")
