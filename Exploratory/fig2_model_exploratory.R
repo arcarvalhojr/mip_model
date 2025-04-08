@@ -19,19 +19,19 @@ model_percentile_fw <- model_weights %>%
                                  probs = 0.05, na.rm = TRUE)) %>%  # getting 5º percentile
   filter(infection %in% c(0, 8)) %>%
   select(mice_id, fetus_id, infection, fetal_weight, percentile_5) %>%
-  mutate(percentile = ifelse(fetal_weight >= percentile_5, "under", "below"))  #classification by the 5º percentile  
+  mutate(percentile = ifelse(fetal_weight >= percentile_5, "above", "below"))  #classification by the 5º percentile  
 
 
 # Saving data set
-#saveRDS(model_percentile_fw, "Data/Clean_data/model_percentile_fw.rds")
+saveRDS(model_percentile_fw, "Data/Clean_data/model_percentile_fw.rds")
 
 
 
 # Analysis of infection on the chances of "fgr" ---------------------------
 
 # glmm model
-glmm_fw <- glmer(factor(percentile)~infection+(1|mice_id),
-                    data= model_percentile_fw, family = "binomial")
+glmm_fw <- glmer(factor(percentile) ~ infection + (1|mice_id),
+                    data = model_percentile_fw, family = "binomial")
 
 
 # model diagnostic
