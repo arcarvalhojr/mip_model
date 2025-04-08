@@ -1,132 +1,160 @@
-#################################################################
-### processamento e analise dos dados relacionados a figura 4 ###
+######## Exploratory analysis of data related to figure 4 ##########
 
-# pacotes solicitados para as analises
-library(tidyverse)
-library(readxl)
-library(writexl)
-library(lme4)
-library(lmerTest)
-library(DHARMa)
-library(flexplot)
-library(emmeans)
-library(report)
-library(outliers)
 
-### importando o data set ###############
+# import libraries --------------------------------------------------------
+
+library(tidyverse)    # For data manipulation and visualization (ggplot2, dplyr, etc.)
+library(lme4)         # For fitting linear and mixed-effects models
+library(DHARMa)       # For residual diagnostics using simulated residuals
+library(performance)  # For model performance checks (R², outliers, assumptions, etc.)
+library(flexplot)     # For visual diagnostics and exploratory data analysis
+
+
+
+# import clean data -------------------------------------------------------
 
 # fetus data set
-comp_data_weight <- read_xlsx("Data/Model_comparison/MODEL DATA_WEIGHT_COMP.xlsx")
-str(model_data_weight)
-
-# transformando as variaveis infection e genotype em fatores
-comp_data_weight$Genotype <- as.factor(comp_data_weight$Genotype)
-comp_data_weight$Infection <- as.factor(comp_data_weight$Infection)
-comp_data_weight$Stillbirth <- as.factor(comp_data_weight$Stillbirth)
-comp_data_weight$Mice_ID <- as.factor(comp_data_weight$Mice_ID)
-
-# o grupo BNTac precisar ser o fator de referencia
-comp_data_weight$Genotype <- relevel(comp_data_weight$Genotype, ref = "BNTac")
-levels(comp_data_weight$Genotype)
+comp_weights <- readRDS("Data/Clean_data/comp_weights.rds")
 
 
-### Analise de peso dos fetos ########################################
 
-# visualisando o dado
-ggplot(comp_data_weight, aes(x= Genotype, y= Fetal_weight, fill= Infection))+
+# analyse of infection*genotype on fetaus weight --------------------------
+
+# looking the data
+ggplot(comp_weights, aes(x = genotype, y = fetal_weight, fill= infection))+
   geom_boxplot()
 
-# modelo lmm
-lmm_fw <- lmer(Fetal_weight~Infection*Genotype+(1|Mice_ID),
-               data= comp_data_weight)
+# lmm models
+lmm_fw <- lmer(fetal_weight ~ infection * genotype + (1|mice_id),
+               data = comp_weights)
 
+# with litter size
+lmm_fw1 <- lmer(fetal_weight ~ infection * genotype + litter_size + (1|mice_id),
+                data= comp_weights)
 
-#diagnostico do modelo
-residuals_fw <- simulateResiduals(fittedModel = lmm_fw)
-plot(residuals_fw)
+# looking the model
+visualize(lmm_fw1, plot = "model", 
+          formula = fetal_weight ~ litter_size + genotype | infection,
+          sample = 37)
 
-visualize(lmm_fw)
+# comparing the fit os the models
+compare_performance(lmm_fw, lmm_fw1, rank = TRUE, verbose = FALSE)
+anova(lmm_fw, lmm_fw1)
 
-# estimates
-summary(lmm_fw)
-report(lmm_fw)
+#no effect for litter size on fetal weight in the model
 
-#verificando outliers
-outs_comp_dams <- comp_data_weight %>%
-  group_by(Genotype, Infection) %>%
-  summarise(
-    grubbs_pvalue = grubbs.test(Fetal_weight)$p.value,
-    outlier = ifelse(grubbs_pvalue < 0.05, Fetal_weight[which.max(
-      abs(Fetal_weight - mean(Fetal_weight)))], NA))
-outs_comp_dams
+# with placental weight
+lmm_fw2 <- lmer(fetal_weight ~ infection * genotype + placenta_weight + (1|mice_id),
+                data= comp_weights)
 
-#removendo outliers
-no_outs_fw <- comp_data_weight %>%
-  filter(!(Genotype == "BNTac" & Infection == "YES" & Fetal_weight == 0.7092)) %>%
-  dplyr::select(Genotype, Mice_ID, Fetus_ID, Infection, Fetal_weight, Litter_size)
+# looking the data
+visualize(lmm_fw2, plot = "model", 
+          formula = fetal_weight ~ placenta_weight + genotype | infection,
+          sample = 37)
 
+# comparing the fit os the models
+compare_performance(lmm_fw, lmm_fw2, rank = TRUE, verbose = FALSE)
 
-#multiplas comparações do modelo
-mtc_fw <- emmeans(lmm_fw, pairwise~Infection*Genotype)
-summary(mtc_fw)
+#seems like simple model is better
 
-### analise do racio #################################################
+# model diagnostic
+simulateResiduals(fittedModel = lmm_fw, plot = TRUE)
 
-# visualisando o dado
-ggplot(comp_data_weight, aes(x= Genotype, y= FW_PW, fill= Infection))+
+visualize(lmm_fw, plot = "residuals")
+
+#homoscedasticity detected but visually don't look bad
+
+check_outliers(lmm_fw, method = "cook")
+
+# removing outliers
+outs_fetalweight <- check_outliers(lmm_fw, method = "cook")
+
+comp_fw_clean <- comp_weights %>% 
+  select(mice_id, fetus_id, genotype, infection, fetal_weight) %>% 
+  slice(-which(outs_fetalweight)) %>% 
+  filter(!is.na(fetal_weight))
+
+ggplot(comp_fw_clean, aes(x = genotype, y = fetal_weight, fill= infection))+
   geom_boxplot()
 
-# modelo lmm
-lmm_ratio <- lmer(FW_PW~Infection*Genotype+(1|Mice_ID), data= comp_data_weight)
+# lmm model without outs
+lmm_fw3 <- lmer(fetal_weight ~ infection * genotype + (1|mice_id),
+                data = comp_fw_clean)
+
+# model diagnostic
+simulateResiduals(fittedModel = lmm_fw3, plot = TRUE)
+
+visualize(lmm_fw3, plot = "residuals")
+
+# saving fetal weitgh clean data
+#saveRDS(comp_fw_clean, "Data/Clean_data/comp_fw_clean.rds")
 
 
-#diagnostico do modelo
-residuals_pw <- simulateResiduals(fittedModel = lmm_ratio)
-plot(residuals_pw)
+# analyse of infection*genotype on fw/pw weight ratio ---------------------
 
-visualize(lmm_ratio)
+# looking the data
+ggplot(comp_weights, aes(x = genotype, y = ratio, fill = infection))+
+  geom_boxplot()
 
-# estimates
-summary(lmm_ratio)
+# lmm models
+lmm_ratio <- lmer(ratio ~ infection * genotype + (1|mice_id),
+                  data= comp_weights)
+
+# model diagnostic
+simulateResiduals(fittedModel = lmm_ratio, plot = TRUE)
+
+visualize(lmm_ratio, plot = "residuals")
+
+check_outliers(lmm_ratio, method = "cook")
+
+# removing outliers
+outs_ratio <- check_outliers(lmm_ratio, method = "cook")
+
+comp_ratio_clean <- comp_weights %>%
+  select(mice_id, fetus_id, genotype, infection, ratio) %>% 
+  slice(- which(outs_ratio)) %>% 
+  filter(!is.na(ratio))
+
+ggplot(comp_ratio_clean, aes(x = genotype, y = ratio, fill = infection))+
+  geom_boxplot()
+
+# lmm model without outs
+lmm_ratio2 <- lmer(ratio ~ infection * genotype + (1|mice_id),
+                   data= comp_ratio_clean)
+
+# model diagnostic
+simulateResiduals(fittedModel = lmm_ratio2, plot = TRUE)
+
+visualize(lmm_ratio2, plot = "residuals")
+
+# saving ratio clean data
+#saveRDS(comp_ratio_clean, "Data/Clean_data/comp_ratio_clean.rds")
 
 
-### percentis fetos #####################################################
 
-# selecionando as variaveis e removendo NAs
-comp_percentil_fw <- comp_data_weight %>%
-  select(Genotype, Mice_ID, Fetus_ID, Infection, Fetal_weight) %>%
-  filter(!is.na(Fetal_weight))
+# analyse of infection*genotype on the chances of fgr ---------------------
 
-# calculando o 5º percentil
-percentil_5 <- comp_percentil_fw %>%
-  filter(Infection == "NO") %>%
-  group_by(Genotype) %>%
-  summarize(percentil_5 = quantile(Fetal_weight, probs = 0.05,
-                                   na.rm = TRUE))
-
-# Criando uma coluna de classificação (abaixo ou acima do 5º percentil)
-comp_percentil_fw <- comp_percentil_fw %>%
-  left_join(percentis_5, by = "Genotype") %>% 
-  mutate(percentil = ifelse(Fetal_weight <= percentil_5, "below", "under"))
+# getting percentile data set
+comp_percentile_fw <- comp_weights %>%
+  group_by(genotype) %>% 
+  mutate(percentile_10 = quantile(fetal_weight[infection == "no"],
+                                 probs = 0.1, na.rm = TRUE)) %>%  # getting 10º percentile
+  select(mice_id, fetus_id, genotype, infection, fetal_weight, percentile_10) %>%
+  filter(!is.na(fetal_weight)) %>% 
+  mutate(percentile = ifelse(fetal_weight >= percentile_10, "above", "below"))  #classification by the 10º percentile  
 
 
-# Salvando como .xlsx
-write_xlsx(comp_percentil_fw, "Data/Model_comparison/comp_percentil_fw.xlsx")
-
-# modelo glmm
-glmm_fw <- glmer(factor(percentil)~Infection*Genotype+(1|Mice_ID),
-                 data = comp_percentil_fw, family = "binomial")
+# glmm model
+glmm_fw <- glmer(factor(percentile) ~ infection * genotype + (1|mice_id),
+                 data = comp_percentile_fw, family = "binomial")
 
 
-# diagnostico do modelo
-residuals_percentil <- simulateResiduals(fittedModel = glmm_fw)
-plot(residuals_percentil)
+# model diagnostic
+#simulateResiduals(fittedModel = glmm_fw, plot = TRUE)
 
-# estimates
-summary(glmm_fw)
+# saving data set
+saveRDS(comp_percentile_fw, "Data/Clean_data/comp_percentile_fw.rds")
 
-#multiplas comparações do modelo
-mtc_percentil <- emmeans(glmm_fw, pairwise~Infection*Genotype)
-summary(mtc_percentil)
 
-### espaço vascular ####################################################
+# analyse of infection*genotype on placental sinusoides area --------------
+
