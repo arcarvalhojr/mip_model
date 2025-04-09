@@ -1,303 +1,291 @@
-#################################################################
-### processamento e analise dos dados relacionados a figura 5 ###
-
-# pacotes solicitados para as analises
-library(tidyverse)
-library(readxl)
-library(writexl)
-library(lme4)
-library(lmerTest)
-library(DHARMa)
-library(flexplot)
-library(report)
-library(outliers)
-
-### importando os data sets ####
-
-# dams data set
-comp_data_dams <- read_xlsx("Data/Model_comparison/MODEL DATA_DAMS_COMP.xlsx")
-str(comp_data_dams)
-
-# transformando as variaveis infection e genotype em fatores
-comp_data_dams$Genotype <- as.factor(comp_data_dams$Genotype)
-comp_data_dams$Infection <- as.factor(comp_data_dams$Infection)
-
-# o grupo BNTac precisar ser o fator de referencia
-comp_data_dams$Genotype <- relevel(comp_data_dams$Genotype, ref = "BNTac")
-levels(comp_data_dams$Genotype)
-
-# fetus data set
-comp_data_weight <- read_xlsx("Data/Model_comparison/MODEL DATA_WEIGHT_COMP.xlsx")
-str(model_data_weight)
-
-# transformando as variaveis infection e genotype em fatores
-comp_data_weight$Genotype <- as.factor(comp_data_weight$Genotype)
-comp_data_weight$Infection <- as.factor(comp_data_weight$Infection)
-comp_data_weight$Mice_ID <- as.factor(comp_data_weight$Mice_ID)
-
-# o grupo BNTac precisar ser o fator de referencia
-comp_data_weight$Genotype <- relevel(comp_data_weight$Genotype, ref = "BNTac")
-levels(comp_data_weight$Genotype)
+######## Exploratory analysis of data related to figure 5 ##########
 
 
-### slecionando variaveis especificas ################################
-cytok_data_dams <- comp_data_dams %>%
-  select(Genotype, Mice_ID, Infection, IL10_sp, MCP1_sp, IFN_sp, TNF_sp,
-         MCP1_sr, IFN_sr, TNF_sr)
+# import library ----------------------------------------------------------
 
-cytok_data_placenta <- comp_data_weight %>%
-  select(Genotype, Mice_ID, Infection, MCP1, IFN)
+library(tidyverse)    # For data manipulation and visualization (ggplot2, dplyr, etc.)
+library(lme4)         # For fitting linear and mixed-effects models
+library(DHARMa)       # For residual diagnostics using simulated residuals
+library(performance)  # For model performance checks (R², outliers, assumptions, etc.)
+library(flexplot)     # For visual diagnostics and exploratory data analysis
 
 
-#### MCP-1 soro #######################################################
 
-#visualizando o dado
-ggplot(cytok_data_dams, aes(x= Infection, y= MCP1_sr, fill= Infection))+
+# import clean data -------------------------------------------------------
+
+# cytokines in damns data set
+comp_ctk_damns <- readRDS("Data/Clean_data/comp_ctk_dams.rds")
+
+# cytokines in fetus data set
+comp_ctk_placentas <- readRDS("Data/Clean_data/comp_ctk_placentas.rds")
+
+
+
+# analyse of infection*genotype on levels of serum mcp1 -------------------
+
+# looking the data
+ggplot(comp_ctk_damns, aes(x = infection, y = mcp1_sr, fill = infection))+
   geom_boxplot(show.legend = FALSE)+
   geom_point(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
+  facet_wrap(~ genotype)+
   theme_bw()
 
+#only detected in infected damns
 
-# Verificação e extração de outliers
-outs_mcp1_sr <- cytok_data_dams %>%
-  group_by(Genotype) %>%
-  summarise(
-    grubbs_pvalue = grubbs.test(MCP1_sr)$p.value,
-    outlier_value = ifelse(grubbs_pvalue < 0.05,
-                           MCP1_sr[which.max(abs(MCP1_sr - mean(MCP1_sr)))],
-                           NA_real_)) %>%
-  filter(!is.na(outlier_value)) %>%
-  ungroup()
+# removing NAs
+comp_mcp1_sr_clean <- comp_ctk_damns %>% 
+  select(mice_id, genotype, infection, mcp1_sr) %>% 
+  filter(!is.na(mcp1_sr))
 
-outs_mcp1_sr
+# glm model
+glm_mcp1_sr <- glm(mcp1_sr ~ genotype, data = comp_mcp1_sr_clean)
 
-#calculando o numero de observações
-n_mcp1_sr <- cytok_data_dams %>%
-  filter(!is.na(MCP1_sr)) %>%
-  group_by(Genotype, Infection) %>%
-  summarise(observacoes= sum(!is.na(MCP1_sr)))
-n_mcp1_sr
+# model diagnostic
+simulateResiduals(fittedModel = glm_mcp1_sr, plot = TRUE)
 
-# modelo glm
-glm_mcp1_sr <- glm(MCP1_sr~Genotype, data = cytok_data_dams,
-                   family = Gamma(link = "identity"))
+visualize(glm_mcp1_sr, plot = "residuals")
 
-# diagnostico do modelo
-residuals_mcp1_sr <- simulateResiduals(fittedModel = glm_mcp1_sr)
-plot(residuals_mcp1_sr)
+check_outliers(glm_mcp1_sr, method = "cook")
 
-visualize(glm_mcp1_sr)
+# removing outlier
+outs_mcp1_sr <- check_outliers(glm_mcp1_sr, method = "cook")
 
-# esyimates
-summary(glm_mcp1_sr)
+comp_mcp1_sr_clean <- comp_mcp1_sr_clean %>% 
+  slice(-which(outs_mcp1_sr))
 
-
-### MCP-1 baço #######################################################
-
-#visualizando o dado
-ggplot(comp_data_dams, aes(x= Infection, y= MCP1_sp, fill= Infection))+
+# looking the data without outs
+ggplot(comp_mcp1_sr_clean, aes(x = infection, y = mcp1_sr, fill = infection))+
   geom_boxplot(show.legend = FALSE)+
   geom_point(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
+  facet_wrap(~ genotype)+
   theme_bw()
 
+# glm model without outs
+glm_mcp1_sr2 <- glm(mcp1_sr ~ genotype, data = comp_mcp1_sr_clean)
 
-#teste de hipotese
-wilcox_mcp1_sp <- wilcox.test(MCP1_sp~Genotype, data = cytok_data_dams,
-                              na.action = na.omit)
-print(wilcox_mcp1_sp)
+# model diagnostic
+simulateResiduals(fittedModel = glm_mcp1_sr2, plot = TRUE)
 
-# modelo glm
-glm_mcp1_sp <- glm(MCP1_sp~Genotype, data = cytok_data_dams,
-                   family = Gamma(link = "identity"))
+visualize(glm_mcp1_sr2, plot = "residuals")
 
-# diagnostico do modelo
-residuals_mcp1_sp <- simulateResiduals(fittedModel = glm_mcp1_sp)
-plot(residuals_mcp1_sp)
 
-visualize(glm_mcp1_sp)
 
-# estimates
-summary(glm_mcp1_sp)
+# analyse of infection*genotype on levels of serum ifn --------------------
 
-#### TNF soro #####################################################
-
-#visualizando o dado
-ggplot(comp_data_dams, aes(x= Infection, y= TNF_sr, fill= Infection))+
+# looking the data
+ggplot(comp_ctk_damns, aes(x = infection, y = ifn_sr, fill = infection))+
   geom_boxplot(show.legend = FALSE)+
   geom_point(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
+  facet_wrap(~ genotype)+
   theme_bw()
 
-# modelo glm
-glm_tnf_sr <- glm(TNF_sr~Genotype, data = cytok_data_dams,
-                   family = Gamma(link = "identity"))
+# removing NAs
+comp_ifn_sr_clean <- comp_ctk_damns %>% 
+  select(mice_id, genotype, infection, ifn_sr) %>% 
+  filter(!is.na(ifn_sr))
 
-# diagnostico do modelo
-residuals_tnf_sr <- simulateResiduals(fittedModel = glm_tnf_sr)
-plot(residuals_tnf_sr)
+# glm model
+glm_ifn_sr <- glm(ifn_sr ~ genotype, data = comp_ifn_sr_clean)
 
-visualize(glm_tnf_sr)
-
-# estimates
-summary(glm_tnf_sr)
-
-
-#teste de hipotese
-wilcox_tnf_sr <- wilcox.test(TNF_sr~Genotype, data = cytok_data_dams,
-                             na.action = na.omit)
-print(wilcox_tnf_sr)
-
-####### TNF baço#####################################################
-
-#visualizando o dado
-ggplot(comp_data_dams, aes(x= Infection, y= TNF_sp, fill= Infection))+
-  geom_boxplot(show.legend = FALSE)+
-  geom_point(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
-  theme_bw()
-
-# modelo glm
-glm_tnf_sp <- glm(TNF_sp~Genotype, data = cytok_data_dams,
-                  family = Gamma(link = "identity"))
-
-# diagnostico do modelo
-residuals_tnf_sp <- simulateResiduals(fittedModel = glm_tnf_sp)
-plot(residuals_tnf_sp)
-
-visualize(glm_tnf_sp)
-
-# estimates
-summary(glm_tnf_sp)
-
-#teste de hipotese
-wilcox_tnf_sp <- wilcox.test(TNF_sp~Genotype, data = cytok_data_dams,
-                             na.action = na.omit)
-print(wilcox_tnf_sp)
-
-####### IFN soro#####################################################
-
-#visualizando o dado
-ggplot(comp_data_dams, aes(x= Infection, y= IFN_sr, fill= Infection))+
-  geom_boxplot(show.legend = FALSE)+
-  geom_point(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
-  theme_bw()
-
-# modelo glm
-glm_ifn_sr <- glm(IFN_sr~Genotype, data = cytok_data_dams,
-                  family = Gamma(link = "identity"))
-
-# diagnostico do modelo
-residuals_ifn_sr <- simulateResiduals(fittedModel = glm_ifn_sr)
-plot(residuals_ifn_sr)
+# model diagnostic
+simulateResiduals(fittedModel = glm_ifn_sr, plot = TRUE)
 
 visualize(glm_ifn_sr)
 
-# estimates
-summary(glm_ifn_sr)
+check_outliers(glm_ifn_sr, method = "cook")
 
-#teste de hipotese
-wilcox_ifn_sr <- wilcox.test(IFN_sr~Genotype, data = cytok_data_dams,
-                             na.action = na.omit)
-print(wilcox_ifn_sr)
+# removing outs
+outs_ifn_sr <- check_outliers(glm_ifn_sr, method = "cook")
 
-####### IFN baço#####################################################
+comp_ifn_sr_clean <- comp_ifn_sr_clean %>% 
+  slice(-which(outs_ifn_sr))
 
-#visualizando o dado
-ggplot(comp_data_dams, aes(x= Infection, y= IFN_sp, fill= Infection))+
+# glm model without outs
+glm_ifn_sr2 <- glm(ifn_sr ~ genotype, data = comp_ifn_sr_clean)
+
+# model diagnostic
+simulateResiduals(fittedModel = glm_ifn_sr2, plot = TRUE)
+
+visualize(glm_ifn_sr2)
+
+
+# analyse of infection*genotype on levels of serum ifn --------------------
+
+# looking the data
+ggplot(comp_ctk_damns, aes(x = infection, y = tnf_sr, fill = infection))+
   geom_boxplot(show.legend = FALSE)+
   geom_point(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
+  facet_wrap(~ genotype)+
   theme_bw()
 
-# modelo glm
-glm_ifn_sp <- glm(IFN_sp~Genotype, data = cytok_data_dams,
-                  family = Gamma(link = "identity"))
+# removing NAs
+comp_tnf_sr_clean <- comp_ctk_damns %>% 
+  select(mice_id, genotype, infection, tnf_sr) %>% 
+  filter(!is.na(tnf_sr))
 
-# diagnostico do modelo
-residuals_ifn_sp <- simulateResiduals(fittedModel = glm_ifn_sp)
-plot(residuals_ifn_sp)
+# glm model
+glm_tnf_sr <- glm(tnf_sr ~ genotype, data = comp_tnf_sr_clean)
+
+# model diagnostic
+simulateResiduals(fittedModel = glm_tnf_sr, plot = TRUE)
+
+visualize(glm_tnf_sr)
+
+check_outliers(glm_tnf_sr, method = "cook")
+
+# removing outs
+outs_tnf_sr <- check_outliers(glm_tnf_sr, method = "cook")
+
+comp_tnf_sr_clean <- comp_tnf_sr_clean %>% 
+  slice(-which(outs_tnf_sr))
+
+# glm model without outs
+glm_tnf_sr2 <- glm(tnf_sr ~ genotype, data = comp_tnf_sr_clean)
+
+# model diagnostic
+simulateResiduals(fittedModel = glm_tnf_sr2, plot = TRUE)
+
+visualize(glm_tnf_sr2)
+
+
+# analyse of infection*genotype on levels of spleen mcp1 ------------------
+
+# looking the data
+ggplot(comp_ctk_damns, aes(x = infection, y = mcp1_sp, fill= infection))+
+  geom_boxplot(show.legend = FALSE)+
+  geom_point(show.legend = FALSE)+
+  facet_wrap(~ genotype)+
+  theme_bw()
+
+#also only detected levels in infected damns
+
+# removing NAs
+comp_mcp1_sp_clean <- comp_ctk_damns %>% 
+  select(mice_id, genotype, infection, mcp1_sp) %>% 
+  filter(!is.na(mcp1_sp))
+
+# glm model
+glm_mcp1_sp <- glm(mcp1_sp ~ genotype, data = comp_mcp1_sp_clean)
+
+# model diagnostic
+simulateResiduals(fittedModel = glm_mcp1_sp, plot = TRUE)
+
+visualize(glm_mcp1_sp)
+
+check_outliers(glm_mcp1_sp, method = "cook")
+
+
+# analyse of infection*genotype on levels of spleen ifn -------------------
+
+# looking the data
+ggplot(comp_ctk_damns, aes(x = infection, y = ifn_sp, fill = infection))+
+  geom_boxplot(show.legend = FALSE)+
+  geom_point(show.legend = FALSE)+
+  facet_wrap(~ genotype)+
+  theme_bw()
+
+# removing NAs
+comp_ifn_sp_clean <- comp_ctk_damns %>% 
+  select(mice_id, genotype, infection, ifn_sp) %>% 
+  filter(!is.na(ifn_sp))
+
+# glm model
+glm_ifn_sp <- glm(ifn_sp ~ genotype, data = comp_ifn_sp_clean)
+
+# model diagnostic
+simulateResiduals(fittedModel = glm_ifn_sp, plot = TRUE)
 
 visualize(glm_ifn_sp)
 
-# estimates
-summary(glm_ifn_sp)
-
-#teste de hipotese
-wilcox_ifn_sp <- wilcox.test(IFN_sp~Genotype, data = cytok_data_dams,
-                             na.action = na.omit)
-print(wilcox_ifn_sp)
+check_outliers(glm_ifn_sp, method = "cook")
 
 
-####### IL-10 baço#####################################################
+# analyse of infection*genotype on levels of spleen tnf -------------------
 
-#visualizando o dado
-ggplot(comp_data_dams, aes(x= Infection, y= IL10_sp, fill= Infection))+
+# looking the data
+ggplot(comp_ctk_damns, aes(x = infection, y = tnf_sp, fill = infection))+
   geom_boxplot(show.legend = FALSE)+
   geom_point(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
+  facet_wrap(~ genotype)+
   theme_bw()
 
-#modelo glm
-glm_il10 <- glm(IL10_sp~Infection*Genotype, data = cytok_data_dams)
+# removing NAs
+comp_tnf_sp_celan <- comp_ctk_damns %>% 
+  select(mice_id, genotype, infection, tnf_sp) %>% 
+  filter(!is.na(tnf_sp))
+
+# glm model
+glm_tnf_sp <- glm(tnf_sp ~ genotype, data = comp_tnf_sp_celan)
+
+# model diagnostic
+simulateResiduals(fittedModel = glm_tnf_sp, plot = TRUE)
+
+visualize(glm_tnf_sp)
+
+check_outliers(glm_tnf_sp, method = "cook")
 
 
+# analyse of infection*genotype on levels of spleen il10 ------------------
 
-#diagnostico do modelo
-residuals_il10 <- simulateResiduals(fittedModel = glm_il10)
-plot(residuals_il10)
-
-visualize(glm_il10)
-
-# estimates
-summary(glm_il10)
-
-
-####### MCP-1 placenta###################################################
-
-#visualizando o dado
-ggplot(comp_data_weight, aes(x= Infection, y= MCP1, fill= Infection))+
+# looking the data
+ggplot(comp_ctk_damns, aes(x = infection, y = il10_sp, fill = infection))+
   geom_boxplot(show.legend = FALSE)+
   geom_point(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
+  facet_wrap(~ genotype)+
   theme_bw()
 
+# glm model
+glm_il10_sp <- glm(il10_sp ~ infection * genotype, data = comp_ctk_damns)
 
-#modelo glm
-glm_mcp1_placenta <- glm(MCP1 ~ Infection * Genotype, data = cytok_data_placenta)
+# model diagnostic
+simulateResiduals(fittedModel = glm_il10_sp, plot = TRUE)
 
+visualize(glm_il10_sp)
 
-#diagnostico do modelo
-residuals_mcp1_placenta <- simulateResiduals(fittedModel = glm_mcp1_placenta)
-plot(residuals_mcp1_placenta)
-
-visualize(glm_mcp1_placenta)
-
-# estimates
-summary(glm_mcp1_placenta)
+check_outliers(glm_il10_sp, method = "cook")
 
 
-####### IFN placenta###################################################
+# analyse of infection*genotype on levels of placenta mcp1 ----------------
 
-#visualizando o dado
-ggplot(comp_data_weight, aes(x= Infection, y= IFN, fill= Infection))+
+# looking the data
+ggplot(comp_ctk_placentas, aes(x = infection, y = mcp1, fill = infection))+
   geom_boxplot(show.legend = FALSE)+
   geom_point(show.legend = FALSE)+
-  facet_wrap(~Genotype)+
+  facet_wrap(~ genotype)+
   theme_bw()
 
+# glm model
+glm_mcp1_pl <- glm(mcp1 ~ infection * genotype, data = comp_ctk_placentas)
 
-#modelo glm
-glm_ifn_placenta <- glm(IFN ~ Genotype, data = cytok_data_placenta)
-summary(glm_ifn)
+# model diagnostic
+simulateResiduals(fittedModel = glm_mcp1_pl, plot = TRUE)
 
-#diagnostico do modelo
-residuals_ifn_placenta <- simulateResiduals(fittedModel = glm_ifn_placenta)
-plot(residuals_ifn_placenta)
+visualize(glm_mcp1_pl)
 
-visualize(glm_ifn_placenta)
+check_outliers(glm_mcp1_pl, method = "cook")
 
-# estimates
-summary(glm_ifn_placenta)
+
+# analyse of infection*genotype on levels of placenta ifn -----------------
+
+# looking the data
+ggplot(comp_ctk_placentas, aes(x = infection, y = ifn, fill = infection))+
+  geom_boxplot(show.legend = FALSE)+
+  geom_point(show.legend = FALSE)+
+  facet_wrap(~ genotype)+
+  theme_bw()
+
+# removing NAs
+comp_ifn_pl_clean <- comp_ctk_placentas %>% 
+  select(mice_id, fetus_id, genotype, infection, ifn) %>% 
+  filter(!is.na(ifn))
+
+# glm model
+glm_ifn_pl <- glm(ifn ~ genotype, data = comp_ifn_pl_clean)
+
+# model diagnostic
+simulateResiduals(fittedModel = glm_ifn_pl, plot = TRUE)
+
+visualize(glm_ifn_pl)
+
+check_outliers(glm_ifn_pl, method = "cook")
+
