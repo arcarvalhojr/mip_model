@@ -1,76 +1,65 @@
 #### Clean data for mip comparrison model analysis ###########################
 
+# Here the raw data for damns and fetus related analysis will be cleaned and
+# saved into .rds files.
 
 # import libraries --------------------------------------------------------
 library(tidyverse)
 library(readxl)
 
 
-# datas related to dams ---------------------------------------------------
-raw_data_dams <- read_xlsx("Data/Raw_data/comp_data_dams.xlsx")
-glimpse(raw_data_dams)
+# Import data -------------------------------------------------------------
+raw_data_dams <- readxl::read_xlsx("Data/Raw_data/comp_data_dams.xlsx")
+raw_comp_parasitemia <- readxl::read_xlsx("Data/Raw_data/comp_parasitemia.xlsx")
+raw_data_fetus <- readxl::read_xlsx("Data/Raw_data/comp_data_fetus.xlsx")
 
-#genotype bntac should be the reference level
-raw_data_dams$genotype <- factor(raw_data_dams$genotype,
-                                    levels = c("BNTac", "BJ"))
-levels(raw_data_dams$genotype)
+# Data related to inf and non-inf dams ------------------------------------
+
+dplyr::glimpse(raw_data_dams)
+
+# control group doesn't have parasitemia, replace NA with 0
+# padronize genotype names to lowercase
+# b6 ntac should be the reference level for analysis
+
 
 # comp dams
 comp_dams <- raw_data_dams %>% 
-  select(genotype, mice_id, infection, ptd, spleen_w)
+  dplyr::mutate(parasitemia = if_else(
+    is.na(parasitemia) & infection == "no", 0, parasitemia
+  )) %>%
+  dplyr::mutate(genotype = tolower(genotype)) %>% 
+  dplyr::mutate(genotype = factor(genotype, levels = c("bntac", "bj")))
+  
 
 saveRDS(comp_dams, "Data/Clean_data/comp_dams.rds")
 
-# comp hematology dams
-comp_hemato_clean <- raw_data_dams %>% 
-  select(genotype, mice_id, infection, rbc, hct, hgb,
-         wbc, lymph, mon, gran) %>% 
-  drop_na()
 
-saveRDS(comp_hemato_clean, "Data/Clean_data/comp_hemato_clean.rds")
 
-# comp cytokines dams
-comp_ctk_dams <- raw_data_dams %>% 
-  select(genotype, mice_id, infection, mcp1_sp, ifn_sp, tnf_sp, il10_sp,
-         mcp1_sr, ifn_sr, tnf_sr)
+# Parasitemia data for preg and non-preg infected dams --------------------
 
-saveRDS(comp_ctk_dams, "Data/Clean_data/comp_ctk_dams.rds")
+dplyr::glimpse(raw_comp_parasitemia)
 
-# comp parasitemia dams
-comp_parasitemia <- read_xlsx("Data/Raw_data/comp_parasitemia.xlsx")
+# padronize genotype names to lowercase
+# b6 ntac should be the reference level for analysis
 
-#genotype bntac should be the reference level
-comp_parasitemia$genotype <- factor(comp_parasitemia$genotype,
-                                 levels = c("BNT", "BJ"))
-levels(comp_parasitemia$genotype)
+comp_parasitemia <- raw_comp_parasitemia %>% 
+  dplyr::mutate(genotype = tolower(genotype)) %>% 
+  dplyr::mutate(genotype = factor(genotype, levels = c("bnt", "bj")))
+
 
 saveRDS(comp_parasitemia, "Data/Clean_data/comp_parasitemia.rds")
 
-# datas related to fetus and placentas ------------------------------------
-raw_data_fetus <- read_xlsx("Data/Raw_data/comp_data_fetus.xlsx")
+# data related to fetus and placentas -------------------------------------
+
 glimpse(raw_data_fetus)
 
-#genotype bntac should be the reference level
-raw_data_fetus$genotype <- factor(raw_data_fetus$genotype,
-                                 levels = c("BNTac", "BJ"))
-levels(raw_data_fetus$genotype)
+# padronize genotype names to lowercase
+# b6 ntac should be the reference level for analysis
 
 # comp fetus and placenta weights
 comp_weights <- raw_data_fetus %>% 
-  select(genotype, mice_id, fetus_id, ini_weight, litter_size, infection,
-         fetal_weight, placenta_weight, ratio, alive)
+  dplyr::mutate(genotype = tolower(genotype)) %>% 
+  dplyr::mutate(genotype = factor(genotype ,levels = c("bntac", "bj")))
+  
 
 saveRDS(comp_weights, "Data/Clean_data/comp_weights.rds")
-
-# comp pb18s
-comp_pb18s <- raw_data_fetus %>% 
-  select(genotype, fetus_id, infection, pb18s) %>% 
-  filter(!is.na(pb18s))
-
-saveRDS(comp_pb18s, "Data/Clean_data/comp_pb18s.rds")
-
-# comp cytokines placentas
-comp_ctk_placentas <- raw_data_fetus %>% 
-  select(genotype, mice_id, fetus_id, infection, mcp1, ifn)
-
-saveRDS(comp_ctk_placentas, "Data/Clean_data/comp_ctk_placentas.rds")
