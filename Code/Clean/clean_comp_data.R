@@ -31,8 +31,7 @@ comp_dams <- raw_data_dams %>%
   dplyr::mutate(genotype = factor(genotype, levels = c("bntac", "bj")))
   
 
-saveRDS(comp_dams, "Data/Clean_data/comp_dams.rds")
-
+#saveRDS(comp_dams, "Data/Clean_data/comp_dams.rds")
 
 
 # Parasitemia data for preg and non-preg infected dams --------------------
@@ -47,7 +46,7 @@ comp_parasitemia <- raw_comp_parasitemia %>%
   dplyr::mutate(genotype = factor(genotype, levels = c("bnt", "bj")))
 
 
-saveRDS(comp_parasitemia, "Data/Clean_data/comp_parasitemia.rds")
+#saveRDS(comp_parasitemia, "Data/Clean_data/comp_parasitemia.rds")
 
 # data related to fetus and placentas -------------------------------------
 
@@ -62,4 +61,4 @@ comp_weights <- raw_data_fetus %>%
   dplyr::mutate(genotype = factor(genotype ,levels = c("bntac", "bj")))
   
 
-saveRDS(comp_weights, "Data/Clean_data/comp_weights.rds")
+#saveRDS(comp_weights, "Data/Clean_data/comp_weights.rds")

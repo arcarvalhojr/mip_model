@@ -37,8 +37,7 @@ model_dams <- raw_data_dams %>%
 
 dplyr::glimpse(model_dams)
 
-saveRDS(model_dams, "Data/Clean_data/model_dams.rds")
-
+#saveRDS(model_dams, "Data/Clean_data/model_dams.rds")
 
 
 # Parasitemia data for preg and non-preg infected dams --------------------
@@ -59,16 +58,18 @@ model_parasitemia <- raw_model_parasitemia %>%
   )) %>% 
   dplyr::mutate(infection = as.factor(infection))
 
-saveRDS(model_parasitemia, "Data/Clean_data/model_parasitemia.rds")
+#saveRDS(model_parasitemia, "Data/Clean_data/model_parasitemia.rds")
 
 # data related to fetus and placentas ------------------------------------
 
 glimpse(raw_data_fetus)
 
 # assign the real names for variable infection
+# variable alive should be a factor for glmm analysis
 
 model_weights <- raw_data_fetus %>% 
   dplyr::mutate(infection = recode(infection, !!!infection_name_map)) %>% 
-  dplyr::mutate(infection = as.factor(infection))
+  dplyr::mutate(infection = as.factor(infection)) %>% 
+  dplyr::mutate(alive = as.factor(alive))
 
-saveRDS(model_weights, "Data/Clean_data/model_weights.rds")
+#saveRDS(model_weights, "Data/Clean_data/model_weights.rds")
