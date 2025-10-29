@@ -28,7 +28,8 @@ comp_dams <- raw_data_dams %>%
     is.na(parasitemia) & infection == "no", 0, parasitemia
   )) %>%
   dplyr::mutate(genotype = tolower(genotype)) %>% 
-  dplyr::mutate(genotype = factor(genotype, levels = c("bntac", "bj")))
+  dplyr::mutate(genotype = factor(genotype, levels = c("bntac", "bj"))) %>% 
+  dplyr::mutate(ptd = as.factor(ptd))
   
 
 #saveRDS(comp_dams, "Data/Clean_data/comp_dams.rds")
@@ -58,7 +59,9 @@ glimpse(raw_data_fetus)
 # comp fetus and placenta weights
 comp_weights <- raw_data_fetus %>% 
   dplyr::mutate(genotype = tolower(genotype)) %>% 
-  dplyr::mutate(genotype = factor(genotype ,levels = c("bntac", "bj")))
+  dplyr::mutate(genotype = factor(genotype ,levels = c("bntac", "bj"))) %>% 
+  dplyr::mutate(ptd = as.factor(ptd)) %>% 
+  dplyr::mutate(alive = as.factor(alive))
   
 
 #saveRDS(comp_weights, "Data/Clean_data/comp_weights.rds")
