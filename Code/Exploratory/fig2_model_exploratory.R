@@ -213,7 +213,6 @@ summary(lmm_ratio_1)
 # Analysis of infection on the chances of "fgr" ---------------------------
 
 model_fgr <- model_weights %>%
-  dplyr::filter(infection %in% c("pbnk65-", "pbnk65+++")) %>%
   dplyr::mutate(percentile_5 = quantile(fetal_weight[infection == "pbnk65-"],
                                  probs = 0.05, na.rm = TRUE)) %>%  # getting 5º percentile
   
@@ -260,10 +259,10 @@ glmm_fgr_2 <- lme4::glmer(percentile ~ infection + placenta_weight + (1|mice_id)
 #singularity detected, maybe overfiting
 
 # compare the effect of infection
-glmm_fgr_full <- lme4::glmer(percentile ~ infection + litter_size + (1|mice_id),
+glmm_fgr_full <- lme4::glmer(percentile ~ infection + (1|mice_id),
                          data = model_fgr, family = "binomial")
 
-glmm_fgr_reduced <- lme4::glmer(percentile ~ litter_size + (1|mice_id),
+glmm_fgr_reduced <- lme4::glmer(percentile ~ + (1|mice_id),
                              data = model_fgr, family = "binomial")
 
 
@@ -344,15 +343,49 @@ performance::model_performance(glmm_stb_full)
 summary(glmm_stb_full)
 
 
+# Analyse of infection on placental vascular space area -------------------
+
+# Looking the data
+ggplot2::ggplot(
+  model_weights, aes(x= infection, y= vascular_space, fill = infection))+
+  geom_boxplot(show.legend = FALSE)
+
+
+model_weights %>% 
+  dplyr::group_by(infection) %>% 
+  dplyr::summarise(n_obs = sum(!is.na(vascular_space)),
+                   n_NA = sum(is.na(vascular_space)))
+
+#many Nas. Not all placentas had good quality H&E slides for analysis
+
+
+# lmm model
+lmm_vasc_space <- lmerTest::lmer(
+  vascular_space ~ infection + (1|mice_id), data= model_weights)
+
+# model diagnostic
+DHARMa::simulateResiduals(fittedModel = lmm_vasc_space, plot = TRUE)
+
+flexplot::visualize(lmm_vasc_space, plot = "residuals")
+
+performance::check_model(lmm_vasc_space)
+
+performance::check_outliers(lmm_vasc_space, method = "cook")
+
+# model output
+performance::model_performance(lmm_vasc_space)
+
+summary(lmm_vasc_space)
+
+
 # Save models output ------------------------------------------------------
 
-models_list <- list(
-  model_lmm_fw = lmm_fw_full,
-  model_lmm_pw = lmm_pw_full,
-  model_lmm_ratio = lmm_ratio_1,
-  model_glmm_fgr = glmm_fgr_full,
-  model_glmm_stb = glmm_stb_full
+models_list <- dplyr::tibble(
+  model_name = c("fetal weight", "placental weight", "fw/pw ratio",
+                 "fgr", "fetal viability", "vascular space"),
+  model_output = list(lmm_fw_full, lmm_pw_full, lmm_ratio_1,
+                      glmm_fgr_full, glmm_stb_full, lmm_vasc_space)
 )
 
 
-#saveRDS(models_list, "Code/Results/Model_outputs/fig2_model_outputs.rds")
+#saveRDS(models_list, "Code/Results/fig2_model_outputs.rds")
