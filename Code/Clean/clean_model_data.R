@@ -65,11 +65,12 @@ model_parasitemia <- raw_model_parasitemia %>%
 glimpse(raw_data_fetus)
 
 # assign the real names for variable infection
-# variable alive should be a factor for glmm analysis
+# variable alive should be a factor for glmm analysis and
+# level "yes" as reference
 
 model_weights <- raw_data_fetus %>% 
   dplyr::mutate(infection = recode(infection, !!!infection_name_map)) %>% 
   dplyr::mutate(infection = as.factor(infection)) %>% 
-  dplyr::mutate(alive = as.factor(alive))
+  dplyr::mutate(alive = factor(alive, levels = c("yes", "no")))
 
 #saveRDS(model_weights, "Data/Clean_data/model_weights.rds")

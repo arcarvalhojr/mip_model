@@ -55,13 +55,14 @@ glimpse(raw_data_fetus)
 
 # padronize genotype names to lowercase
 # b6 ntac should be the reference level for analysis
+# variable alive shoud be factor and "yes" as reference level
 
 # comp fetus and placenta weights
 comp_weights <- raw_data_fetus %>% 
   dplyr::mutate(genotype = tolower(genotype)) %>% 
   dplyr::mutate(genotype = factor(genotype ,levels = c("bntac", "bj"))) %>% 
   dplyr::mutate(ptd = as.factor(ptd)) %>% 
-  dplyr::mutate(alive = as.factor(alive))
+  dplyr::mutate(alive = factor(alive, levels = c("yes", "no")))
   
 
 #saveRDS(comp_weights, "Data/Clean_data/comp_weights.rds")
