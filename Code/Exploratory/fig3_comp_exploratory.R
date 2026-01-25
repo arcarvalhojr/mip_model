@@ -223,10 +223,9 @@ summary(glm_hgb)
 # Save models output ------------------------------------------------------
 
 models_list <- dplyr::tibble(
-  model_name = c("peripheral parasitemia", "placental parasitemia",
+  model_name = c("placental parasitemia",
                   "erithrocytes", "hematocrite", "hemoglobin"),
-  model_output = list(glm_parasitemia_2, glm_pb18s_2,
-                       glm_rbc, glm_hct, glm_hgb)
+  model_output = list(glm_pb18s_2, glm_rbc, glm_hct, glm_hgb)
 )
 
 
