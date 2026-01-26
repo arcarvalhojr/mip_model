@@ -62,6 +62,40 @@ ggplot(comp_data_weight, aes(x= Genotype, y= Fetal_weight, fill= Infection))+
   
 ggsave("Plots/Comparison/comp_fw.tiff", width = 6, height = 5)
 
+
+
+# placental weight --------------------------------------------------------
+
+#criando uma tabela com o n de observações por camundongo por grupo
+n_pw_comp <- comp_data_weight %>% 
+  filter(!is.na(Placenta_weight)) %>%
+  group_by(Genotype, Infection) %>%
+  summarise(observacoes= n_distinct(Mice_ID)) #conta o número de valores únicos na variavel
+n_pw_comp
+
+#customizando boxplot para visualização do peso das placentas
+ggplot(comp_data_weight, aes(x= Genotype, y= Placenta_weight, fill= Infection))+
+  geom_boxplot(show.legend = FALSE, outlier.shape = NA, width= 0.8)+
+  geom_quasirandom(show.legend = FALSE, size = 1.5, dodge.width = 0.8,
+                   cex = 4)+
+  labs(x= NULL, y= "Placental weight (mg)")+
+  scale_x_discrete(breaks= c("BJ", "BNTac"),
+                   labels= c("C57BL/6J\n(n=9-5)",
+                             "C57BL/6NTac\n(n=9-6)"))+
+  scale_fill_manual(name= NULL,
+                    breaks = c("NO", "YES"),
+                    labels= c("Non-infected", "Infected"),
+                    values = c("#91BFDB", "#F1A340"))+
+  scale_y_continuous(limits = c(50, 250), breaks = seq(50, 250, by= 50),
+                     expand = c(0,0))+
+  theme_classic()+
+  theme(axis.title.y = element_text(size = 20),
+        axis.text.y = element_text(size = 16),
+        axis.text.x = element_text(size = 16))
+
+ggsave("Plots/Comparison/comp_pw.tiff", width = 6, height = 5)
+
+
 ### razão peso dos fetos pelo peso da placenta (racio)##################
 
 # criando uma tabela com o n de observações por camundongo por grupo
@@ -178,4 +212,63 @@ ggplot(rel_aboun_fw, aes(x= Infection, y= percent, fill= percentil)) +
 
 ggsave("Plots/Comparison/comp_stacked_fw.tiff", width= 7, height= 6)
 
+
+
+# fetal viability ---------------------------------------------------------
+
+#selecionando as variaveis
+stb_comp_data <- comp_data_weight %>%
+  select(Genotype, Mice_ID, Fetus_ID, Infection, Stillbirth) %>%
+  filter(!is.na(Stillbirth) & Stillbirth != "" & Stillbirth != "NA")
+
+#calculando o numero de obvservações
+n_stb <- stb_comp_data %>%
+  filter(!is.na(Stillbirth)) %>%
+  group_by(Genotype, Infection) %>%
+  count(Stillbirth)
+n_stb
+
+#Calculando proporções para cada grupo de genotipo e infecção
+stb_rel_abun<- stb_comp_data %>%
+  group_by(Genotype, Infection, Stillbirth) %>%
+  summarise(count= n()) %>%
+  mutate(percent= (count / sum(count)) *100) %>%
+  mutate(text_label = ifelse(Stillbirth == "NO",
+                             paste0(count, "/", sum(count)), "")) %>%
+  dplyr::select(Genotype, Infection, Stillbirth, percent, text_label)
+stb_rel_abun
+
+#stacked bar plot
+ggplot(stb_rel_abun, aes(x= Infection, y= percent, fill= Stillbirth)) +
+  geom_col(width= 0.8, color= "black") +
+  facet_wrap(~Genotype, labeller = as_labeller(c(
+    BNTac= "C57BL/6NTac", BJ= "C57BL/6J")))+
+  labs(x= "Infection", y= "Percentage of the fetus (%)")+
+  scale_x_discrete(breaks= c("NO", "YES"),
+                   labels= c("No", "Yes")) +
+  scale_fill_manual(name= NULL,
+                    breaks = c("NO", "YES"),
+                    values= c("black", "#ffffff"),
+                    labels= c("Non-viable", "Viable"))+
+  scale_y_continuous(limits = c(0, 100.5), breaks = seq(0, 100.5, by= 20),
+                     expand = c(0,0)) +
+  theme_classic()+
+  theme(strip.background = element_blank(),
+        strip.text = element_text(size= 15),
+        legend.position = "top",
+        legend.text = element_text(size= 13),
+        axis.title = element_text(size= 20),
+        axis.text.y = element_text(size= 16),
+        axis.text.x = element_text(size= 16)) +
+  geom_text(aes(label = text_label),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 5)
+
+ggsave("Plots/Comparison/comp_stb.tiff", width= 7, height= 6)   
+
+
 ### espaço vascular ######################################################
+
+
+

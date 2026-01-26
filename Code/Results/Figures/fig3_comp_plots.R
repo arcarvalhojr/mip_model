@@ -163,48 +163,6 @@ ggplot(comp_data_dams, aes(x= Genotype, y= HGB, fill= Infection)) +
 
 ggsave("Plots/Comparison/comp_hgb.tiff", width = 6, height = 5)
 
-### porcentagem de pre termo (PTD) ####################################
-
-# calculando o numero de observações por grupo
-n_ptd <- comp_data_dams %>%
-  group_by(Genotype, Infection) %>%
-  count(Infection, PTD)
-n_ptd
-
-# criando uma tabela de contingencia
-ptd_rel_abun<- comp_data_dams %>%
-  group_by(Infection, Genotype, PTD) %>%
-  summarise(count= n()) %>%
-  mutate(percent= (count / sum(count)) *100) %>%
-  mutate(text_label = ifelse(PTD == "YES",
-                             paste0(count, "/", sum(count)), "")) %>%
-  dplyr::select(Genotype, Infection, PTD, percent, text_label)
-ptd_rel_abun
-
-ggplot(ptd_rel_abun, aes(x= Infection, y= percent, fill= PTD)) +
-  geom_col(width= 0.9, color= "black") +
-  facet_wrap(~Genotype, labeller = as_labeller(c("BJ"= "C57BL/6J",
-                                                 "BNTac"= "C57BL/6NTac"))) +
-  scale_x_discrete(breaks = c("NO", "YES"), labels = c("No", "Yes")) +
-  labs(x= "Infection", y= "Percentage of the dams (%)") +
-  scale_fill_manual(name= NULL,
-                    breaks = c("NO", "YES"),
-                    values= c("white", "black"),
-                    labels= c("Euthanasia", "Pre-term delivery")) +
-  scale_y_continuous(limits = c(0, 100.5), breaks = seq(0, 100.5, by= 20),
-                     expand = c(0,0)) +
-  theme_classic()+
-  theme(strip.background = element_blank(),
-        strip.text = element_text(size= 13),
-        legend.text = element_text(size= 13),
-        axis.title = element_text(size= 20),
-        axis.text = element_text(size= 16)) +
-  geom_text(aes(label = text_label),
-            position = position_stack(vjust = 0.5),
-            color = "white",
-            size = 5)
-
-ggsave("Plots/Comparison/comp_ptd.tiff", width = 6, height = 5)
 
 ### percentual de parasitemia periferica ##############################
 
