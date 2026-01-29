@@ -6,7 +6,6 @@
 library(tidyverse)
 library(ggtext)
 library(ggbeeswarm)
-library(ggsignif)
 library(broom)
 library(ggpubr)
 
@@ -21,18 +20,12 @@ model_pb18s <- readRDS("Data/Clean_data/model_pb18s_clean.rds")
 # dams peripheral parasitemia data set
 model_parasitemia <- readRDS("Data/Clean_data/model_parasitemia.rds")
 
+# hematologic parameters data set
+model_hematology <- readRDS("Data/Clean_data/model_hemato_clean.rds")
+
+
 # import models outputs
 models_output <- readRDS("Code/Results/fig1_model_outputs.rds")
-
-# funcyion to calculate the median iqr and limits
-median_iqr <- function(x)
-{
-  data.frame(
-    y= median(x),
-    ymin= quantile(x, 0.25),
-    ymax= quantile(x, 0.75)
-  )
-}
 
 
 # spleen weight -----------------------------------------------------------
@@ -50,10 +43,9 @@ glm_sw = models_output %>%
     p_label = scales::pvalue(p.value, accuracy = 0.001, add_p = TRUE)
   )
 
-
-ggplot2::ggplot(model_dams,
-                aes(x= infection, y= spleen_w, fill= infection)) +
-  stat_summary(fun.data = mean_sdl, geom = "errorbar", color= "black",
+# create the plot
+ggplot2::ggplot(model_dams, aes(x= infection, y= spleen_w, fill= infection)) +
+  stat_summary(fun.data = ggpubr::mean_sd, geom = "errorbar", color= "black",
                width= 0.3, show.legend = FALSE) + #add std errorbars
   stat_summary(fun= mean, show.legend = FALSE, geom = "crossbar",
                width= 0.5, color= "black") + #add the mean
@@ -63,7 +55,7 @@ ggplot2::ggplot(model_dams,
   scale_fill_manual(values= c("#636363", "#fcae91", "#fb6a4a", "#cb181d")) + #add custom colors (colorblind safe)
   scale_y_continuous(limits = c(50, 450), breaks = seq(50, 450, by= 100),
                      expand = c(0,0)) + #customize axis limits
-  theme_classic()+ #add classic theme with white background
+  theme_classic() + #add classic theme with white background
   theme(axis.title.y = element_text(size = 20),
         axis.text.y = element_text(size= 16),
         axis.text.x = element_text(size= 16)) + #change text font size
@@ -74,7 +66,7 @@ ggplot2::ggplot(model_dams,
     tip.length = 0.01,
     label.size = 5)
  
-ggsave("Plots/Caracterization/spleen.png", width = 6, height = 5) #save image
+ggsave("Images/Plots/model_spleen.png", width = 7, height = 5) #save image
 
 
 # peripheral parasitemia --------------------------------------------------
@@ -96,13 +88,14 @@ parasitemia_stat <- data.frame(
   label = "Pregnancy effect: *p*<0.001"
 )
 
-
-ggplot(model_parasitemia, aes(x= preg, y= parasitemia, fill= preg)) +
-  stat_summary(fun.data = mean_sdl, fun.args = list(mult = 1),
-               geom= "errorbar", color= "black", width= 0.3) +
+# create the plot
+ggplot2::ggplot(model_parasitemia, aes(x= preg, y= parasitemia, fill= preg)) +
+  stat_summary(fun.data = ggpubr::mean_sd, geom= "errorbar",
+               color= "black", width= 0.3) +
   stat_summary(show.legend = FALSE, fun = mean, geom = "crossbar",
                width= 0.5, color= "black") +
-  geom_quasirandom(show.legend = FALSE, shape= 21, size= 4, color= "black") +
+  ggbeeswarm::geom_quasirandom(show.legend = FALSE, shape= 21,
+                               size= 5, color= "black") +
   facet_grid(~ infection) +
   labs(x= "Pregnancy", y= "Peripheral parasitemia (%)") +
   scale_x_discrete(breaks = c("no", "yes"),
@@ -111,7 +104,7 @@ ggplot(model_parasitemia, aes(x= preg, y= parasitemia, fill= preg)) +
   scale_y_continuous(limits = c(0, 15), breaks = seq(0, 15, by= 3),
                      expand = c(0,0)) +
   theme_classic() +
-  theme(strip.background = element_blank(),
+  theme(#strip.background = element_blank(),
         strip.text = element_text(size= 14),
         axis.title.y = element_text(size= 20),
         axis.title.x = element_text(size = 20),
@@ -120,23 +113,16 @@ ggplot(model_parasitemia, aes(x= preg, y= parasitemia, fill= preg)) +
   ggtext::geom_richtext(
     data = parasitemia_stat, 
     aes(label = label, y = 13),
-    fill = NA,          # Remove o fundo branco
-    label.color = NA,   # Remove a borda da caixa
-    size = 4,           # Tamanho da fonte
-    hjust = 0.25           # Alinha à esquerda
+    fill = NA,          
+    label.color = NA,   
+    size = 5,           
+    hjust = 0.25           
   )
 
-ggsave("Plots/Caracterization/peri_para.png", width = 6, height = 5)
+ggsave("Images/Plots/model_parasitemia.png", width = 8, height = 5)
 
 
 # placental parasitemia (pb18s expression) --------------------------------
-
-# get the number of obs
-n_pb18s <- model_pb18s_data %>%
-  filter(!is.na(pb18s)) %>%
-  group_by(Infection) %>%
-  summarise(observacoes= sum(!is.na(pb18s)))
-n_pb18s
 
 # get model output and p-value
 glm_pb18s = models_output %>% 
@@ -151,15 +137,16 @@ glm_pb18s = models_output %>%
     p_label = scales::pvalue(p.value, accuracy = 0.001, add_p = TRUE)
   )
 
-
-ggplot(model_pb18s, aes(x= infection, y= pb18s, fill= infection)) +
+# create the plot
+ggplot2::ggplot(model_pb18s, aes(x= infection, y= pb18s, fill= infection)) +
   stat_summary(fun= median, show.legend = FALSE, geom = "crossbar",
                width= 0.5, color= "black") +
-  geom_quasirandom(show.legend = FALSE, size = 5, shape= 21, color= "black")+
-  labs(x= NULL, y= "pb18s mRNA (relative expression)") +
+  ggbeeswarm::geom_quasirandom(show.legend = FALSE, size = 5,
+                               shape= 21, color= "black") +
+  labs(x= NULL, y = bquote("pb18s mRNA (" * 2^{-Delta * Delta * Ct} * ")")) +
   scale_fill_manual(values= c("#fcae91", "#fb6a4a", "#cb181d")) +
   scale_y_log10() +
-  theme_classic()+
+  theme_classic() +
   theme(axis.title.y = element_text(size = 20),
         axis.text.y = element_text(size= 16),
         axis.text.x = element_text(size= 16)) +
@@ -170,114 +157,130 @@ ggplot(model_pb18s, aes(x= infection, y= pb18s, fill= infection)) +
     tip.length = 0.01,
     label.size = 5)
 
-ggsave("Plots/Caracterization/pb18s.png", width= 6, height= 5)
-
+ggsave("Images/Plots/model_pb18s.png", width= 6, height= 5)
 
 
 # erithrocytes (RBC) ------------------------------------------------------
 
-# computando o numero de observações da variavel
-n_rbc <- model_data_dams %>%
-  filter(!is.na(RBC)) %>%
-  group_by(Infection) %>%
-  summarise(observacoes= sum(!is.na(RBC)))
-n_rbc
+# get model output and p-value
+glm_rbc = models_output %>% 
+  dplyr::filter(model_name == "erytrocytes") %>% 
+  dplyr::pull(model_output) %>% 
+  .[[1]] %>%
+  broom::tidy() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    group1 = "pbnk65-",
+    group2 = str_remove(term, "infection"),
+    p_label = scales::pvalue(p.value, accuracy = 0.001, add_p = TRUE)
+  )
 
-ggplot(model_data_dams, aes(x= Infection, y= RBC, fill= Infection)) +
-  stat_summary(fun.data = median_iqr, geom= "errorbar", color= "black",
-               width= 0.3, show.legend = FALSE) + #adicionando o iqr gerado pela função
-  stat_summary(fun = median, show.legend = FALSE, geom = "crossbar",
-               width= 0.5, color= "black") + #adicionando a mediana 
-  geom_quasirandom(show.legend = FALSE, shape= 21, size= 6, color= "black")+ #adicionando os pontos
-  labs(x= NULL, y= "Red blood cells (x10^6/uL)") +
-  scale_x_discrete(breaks = c("0", "2", "4", "8"),
-                   labels = c("PbNK65-\n(n=5)",
-                              "PbNK65+\n(n=5)",
-                              "PbNK65++\n(n=5)",
-                              "PbNK65+++\n(n=4)")) + #trocando a legenda padrão e adicionando o n de observações
-  scale_fill_manual(values = c("#cccccc","#fcae91", "#fb6a4a", "#cb181d")) + #customisando as cores
+# create the plot
+ggplot2::ggplot(model_hematology, aes(x= infection, y= rbc, fill= infection)) +
+  stat_summary(fun.data = ggpubr::mean_sd, geom= "errorbar", color= "black",
+               width= 0.3, show.legend = FALSE) + 
+  stat_summary(fun = mean, show.legend = FALSE, geom = "crossbar",
+               width= 0.5, color= "black") + 
+  ggbeeswarm::geom_quasirandom(show.legend = FALSE, shape= 21,
+                               size= 6, color= "black") + 
+  labs(x= NULL, y = bquote("Red blood cells (x 10"^6*"/"*mu*"L)")) +
+  scale_fill_manual(values = c("#636363","#fcae91", "#fb6a4a", "#cb181d")) + 
   scale_y_continuous(limits = c(4, 10), breaks = seq(4, 10, by= 2),
-                     expand = c(0,0)) + #customisando os intervalos dos eixos
-  theme_classic() + #adicionando o tema com fundo branco
+                     expand = c(0,0)) + 
+  theme_classic() + 
   theme(axis.title.y = element_text(size = 20),
         axis.text.y = element_text(size = 16),
-        axis.text.x = element_text(size = 15)) + #alterando o tamanho das legendas dos eixos
-  geom_signif(comparisons = list(c("0", "4")),
-              annotations = c("*"),
-              y_position = c(9),
-              textsize = 6, tip_length = 0.03, vjust = 0.3) #adicionando a estatistica 
+        axis.text.x = element_text(size = 16)) +
+  ggpubr::stat_pvalue_manual(
+    glm_rbc, 
+    label = "p_label", 
+    y.position = c(8.6, 9.1, 9.6),
+    tip.length = 0.01,
+    label.size = 5)
 
-ggsave("Plots/Caracterization/rbc.tiff", width = 6, height = 5) #salvando a imagem
+
+ggsave("Images/Plots/model_rbc.png", width = 7, height = 5) 
 
 
 # hematocrite (HCT) -------------------------------------------------------
 
-#computando o numero de observações da variavel
-n_hct <- model_data_dams %>%
-  filter(!is.na(HCT)) %>%
-  group_by(Infection) %>%
-  summarise(observacoes= sum(!is.na(HCT)))
-n_hct
+# get model output and p-value
+glm_hct = models_output %>% 
+  dplyr::filter(model_name == "hematocrite") %>% 
+  dplyr::pull(model_output) %>% 
+  .[[1]] %>%
+  broom::tidy() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    group1 = "pbnk65-",
+    group2 = str_remove(term, "infection"),
+    p_label = scales::pvalue(p.value, accuracy = 0.001, add_p = TRUE)
+  )
 
-ggplot(model_data_dams, aes(x= Infection, y= HCT, fill= Infection)) +
-  stat_summary(fun.data = median_iqr, geom= "errorbar", color= "black",
+# create the plot 
+ggplot2::ggplot(model_hematology, aes(x= infection, y= hct, fill= infection)) +
+  stat_summary(fun.data = ggpubr::mean_sd, geom= "errorbar", color= "black",
                width= 0.3, show.legend = FALSE) +
-  stat_summary(fun = median, show.legend = FALSE, geom = "crossbar",
+  stat_summary(fun = mean, show.legend = FALSE, geom = "crossbar",
                width= 0.5, color= "black") +
-  geom_quasirandom(show.legend = FALSE, shape= 21, size= 6, color= "black")+
+  ggbeeswarm::geom_quasirandom(show.legend = FALSE, shape= 21,
+                               size= 6, color= "black") +
   labs(x= NULL, y= "Hematocrit (%)") +
-  scale_x_discrete(breaks = c("0", "2", "4", "8"),
-                   labels = c("PbNK65-\n(n=5)",
-                              "PbNK65+\n(n=5)",
-                              "PbNK65++\n(n=5)",
-                              "PbNK65+++\n(n=4)")) +
-  scale_fill_manual(values = c("#cccccc", "#fcae91", "#fb6a4a", "#cb181d")) +
+  scale_fill_manual(values = c("#636363", "#fcae91", "#fb6a4a", "#cb181d")) +
   scale_y_continuous(limits = c(23, 43), breaks = seq(23, 43, by= 5),
                      expand = c(0,0)) +
-  theme_classic()+
+  theme_classic() +
   theme(axis.title.y = element_text(size= 20),
         axis.text.y = element_text(size= 16),
         axis.text.x = element_text(size= 15)) +
-  geom_signif(comparisons = list(c("0", "4")),
-              annotations = c("**"),
-              y_position = c(40),
-              textsize = 6, tip_length = 0.03, vjust = 0.3)
+  ggpubr::stat_pvalue_manual(
+    glm_hct, 
+    label = "p_label", 
+    y.position = c(39.2, 40.6, 42),
+    tip.length = 0.01,
+    label.size = 5)
+  
 
-ggsave("Plots/Caracterization/hct.tiff", width = 6, height = 5)
+ggsave("Images/Plots/model_hct.png", width = 7, height = 5)
 
 
 # hemoglobin (HGB) --------------------------------------------------------
 
-#criando um atabela com o numero de observações
-n_hgb <- model_data_dams %>%
-  filter(!is.na(HGB)) %>%
-  group_by(Infection) %>%
-  summarise(observacoes= sum(!is.na(HGB)))
-n_hgb
+# get model output and p-value
+glm_hgb = models_output %>% 
+  dplyr::filter(model_name == "hemoglobin") %>% 
+  dplyr::pull(model_output) %>% 
+  .[[1]] %>%
+  broom::tidy() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    group1 = "pbnk65-",
+    group2 = str_remove(term, "infection"),
+    p_label = scales::pvalue(p.value, accuracy = 0.001, add_p = TRUE)
+  )
 
-ggplot(model_data_dams, aes(x= Infection, y= HGB, fill= Infection)) +
-  stat_summary(fun.data = median_iqr, geom= "errorbar", color= "black",
+# create the plot
+ggplot2::ggplot(model_hematology, aes(x= infection, y= hgb, fill= infection)) +
+  stat_summary(fun.data = ggpubr::mean_sd, geom= "errorbar", color= "black",
                width= 0.3, show.legend = FALSE) +
-  stat_summary(fun = median, show.legend = FALSE, geom = "crossbar",
+  stat_summary(fun = mean, show.legend = FALSE, geom = "crossbar",
                width= 0.5, color= "black") +
-  geom_quasirandom(show.legend = FALSE, shape= 21, size= 6, color= "black")+
-  labs(x= NULL, y= "Hemoglobin (g/dL)") +
-  scale_x_discrete(breaks = c("0", "2", "4", "8"),
-                   labels = c("PbNK65-\n(n=5)",
-                              "PbNK65+\n(n=5)",
-                              "PbNK65++\n(n=5)",
-                              "PbNK65+++\n(n=4)")) +
-  scale_fill_manual(values = c("#cccccc", "#fcae91", "#fb6a4a", "#cb181d")) +
+  ggbeeswarm::geom_quasirandom(show.legend = FALSE, shape= 21,
+                               size= 6, color= "black") +
+  labs(x= NULL, y = "Hemoglobin (g/dL)") +
+  scale_fill_manual(values = c("#636363", "#fcae91", "#fb6a4a", "#cb181d")) +
   scale_y_continuous(limits = c(8, 16), breaks = seq(8, 16, by= 2),
                      expand = c(0,0)) +
-  theme_classic()+
+  theme_classic() +
   theme(axis.title.y = element_text(size= 20),
         axis.text.y = element_text(size= 16),
-        axis.text.x = element_text(size= 15)) +
-  geom_signif(comparisons = list(c("0", "4")),
-              annotations = c("*"),
-              y_position = c(15),
-              textsize = 6, tip_length = 0.03, vjust = 0.3)
+        axis.text.x = element_text(size= 16)) +
+  ggpubr::stat_pvalue_manual(
+    glm_hgb, 
+    label = "p_label", 
+    y.position = c(13.7, 14.5, 15.3),
+    tip.length = 0.01,
+    label.size = 5)
 
-ggsave("Plots/Caracterization/hgb.tiff", width = 6, height = 5)
+ggsave("Images/Plots/model_hgb.png", width = 7, height = 5)
 
