@@ -18,8 +18,9 @@ raw_model_parasitemia <- readxl::read_xlsx(
 
 glimpse(raw_data_dams)
 
+# padronize variables to lowercase
 # assign the real names for variable infection
-# control group doesn't have parasitemia, replace NA with 0
+# control group doesn't have parasitemia
 
 infection_name_map = c(
   "0" = "pbnk65-",
@@ -28,12 +29,13 @@ infection_name_map = c(
   "8" = "pbnk65+++"
 )
 
-model_dams <- raw_data_dams %>% 
+model_dams <- raw_data_dams %>%
+  dplyr::mutate(mice_id = tolower(mice_id)) %>% 
   dplyr::mutate(infection = recode(infection, !!!infection_name_map)) %>% 
-  dplyr::mutate(infection = as.factor(infection)) %>% 
-  dplyr::mutate(parasitemia = if_else(
-    is.na(parasitemia) & infection == "pbnk65-", 0, parasitemia
-  ))
+  dplyr::mutate(infection = factor(
+    infection, levels = c("pbnk65-", "pbnk65+", "pbnk65++", "pbnk65+++"))) %>%
+  dplyr::mutate(ptd = as.factor(ptd))
+  
 
 dplyr::glimpse(model_dams)
 
@@ -42,7 +44,7 @@ dplyr::glimpse(model_dams)
 
 # Parasitemia data for preg and non-preg infected dams --------------------
 
-glimpse(model_parasitemia)
+glimpse(raw_model_parasitemia)
 
 # assign the real names for variable infection
 
@@ -56,7 +58,9 @@ model_parasitemia <- raw_model_parasitemia %>%
   dplyr::mutate(infection = recode(
     infection, !!!parasitemia_inf_name_map
   )) %>% 
-  dplyr::mutate(infection = as.factor(infection))
+  dplyr::mutate(infection = factor(
+    infection, levels = c("pbnk65+", "pbnk65++", "pbnk65+++"))) %>% 
+  dplyr::mutate(preg = as.factor(preg))
 
 #saveRDS(model_parasitemia, "Data/Clean_data/model_parasitemia.rds")
 
@@ -65,12 +69,15 @@ model_parasitemia <- raw_model_parasitemia %>%
 glimpse(raw_data_fetus)
 
 # assign the real names for variable infection
-# variable alive should be a factor for glmm analysis and
-# level "yes" as reference
+# variable fetal_viability should have "yes" as the reference level
 
-model_weights <- raw_data_fetus %>% 
+model_weights <- raw_data_fetus %>%
+  dplyr::mutate(dplyr::across(c(mice_id, fetus_id), tolower)) %>% 
   dplyr::mutate(infection = recode(infection, !!!infection_name_map)) %>% 
-  dplyr::mutate(infection = as.factor(infection)) %>% 
-  dplyr::mutate(alive = factor(alive, levels = c("yes", "no")))
+  dplyr::mutate(infection = factor(
+    infection, levels = c("pbnk65-", "pbnk65+", "pbnk65++", "pbnk65+++"))) %>%
+  dplyr::mutate(ptd = as.factor(ptd)) %>% 
+  dplyr::mutate(fetal_viability = factor(
+    fetal_viability, levels = c("yes", "no")))
 
 #saveRDS(model_weights, "Data/Clean_data/model_weights.rds")
