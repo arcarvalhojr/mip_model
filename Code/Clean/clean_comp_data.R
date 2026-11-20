@@ -41,7 +41,11 @@ dplyr::glimpse(raw_comp_parasitemia)
 
 comp_parasitemia <- raw_comp_parasitemia %>% 
   dplyr::mutate(dplyr::across(c(genotype, mice_id), tolower)) %>% 
-  dplyr::mutate(genotype = factor(genotype, levels = c("bnt", "bj")))
+  dplyr::mutate(
+    genotype = dplyr::recode(genotype, "bnt" = "bntac"), 
+    genotype = factor(genotype, levels = c("bntac", "bj")),
+    preg = as.factor(preg)
+    )
 
 
 #saveRDS(comp_parasitemia, "Data/Clean_data/comp_parasitemia.rds")
@@ -64,4 +68,4 @@ comp_weights <- raw_data_fetus %>%
   
   
 
-saveRDS(comp_weights, "Data/Clean_data/comp_weights.rds")
+#saveRDS(comp_weights, "Data/Clean_data/comp_weights.rds")
