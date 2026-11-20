@@ -182,10 +182,10 @@ summary(glm_mon)
 # save model output -------------------------------------------------------
 
 model_list <- dplyr::tibble(
-  model_name = c("ptd", "spleen weight", "leucocytes",
-                 "lymphocytes", "granulocytes", "monocytes"),
-  model_output = list(glm_ptd, glm_sw, glm_wbc,
-                      glm_lymph, glm_gran, glm_mon)
+  model_name = c("spleen weight", "leucocytes", "lymphocytes",
+                 "granulocytes", "monocytes", "ptd"),
+  model_output = list(glm_sw, glm_wbc, glm_lymph,
+                      glm_gran, glm_mon, glm_ptd)
 )
 
 #saveRDS(model_list, "Code/Results/supfig2_model_outputs.rds")
