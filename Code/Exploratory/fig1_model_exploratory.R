@@ -3,10 +3,9 @@
 
 # import libraries --------------------------------------------------------
 
-library(tidyverse)    # For data manipulation and visualization (ggplot2, dplyr, etc.)
+library(tidyverse)    # For data manipulation and visualization
 library(DHARMa)       # For residual diagnostics using simulated residuals
-library(performance)  # For model performance checks (R², outliers, assumptions, etc.)
-library(flexplot)     # For visual diagnostics and exploratory data analysis
+library(performance)  # For model performance checks
 
 # import clean data -------------------------------------------------------
 
@@ -30,7 +29,8 @@ ggplot2::ggplot(
   
 model_dams %>%
   dplyr::group_by(infection) %>%
-  dplyr::summarise(n_spleen = sum(!is.na(spleen_w)))
+  dplyr::summarise(n_spleen = sum(!is.na(spleen_w)),
+                   n_NA = sum(is.na(spleen_w)))
 
 
 # glm model
@@ -39,26 +39,25 @@ glm_sw <- glm(spleen_w ~ infection, data = model_dams)
 # model diagnostic
 DHARMa::simulateResiduals(fittedModel = glm_sw, plot = TRUE)
 
-flexplot::visualize(glm_sw, plot = "residuals")
-
-performance::check_outliers(glm_sw, method = "cook")
 
 # model output
 performance::model_performance(glm_sw)
 
 summary(glm_sw)
 
+
 # Analyse of the effect of pregnancy on susceptibility to infection -------
 
 # looking the data
 ggplot2::ggplot(
-  model_parasitemia, aes(x = preg, y = parasitemia, fill = infection))+
+  model_parasitemia, aes(x = preg, y = parasitemia, fill = infection)) +
   geom_boxplot()
 
 
 model_parasitemia %>%
-  dplyr::group_by(infection, preg) %>%
-  dplyr::summarise(n_parasitemia = sum(!is.na(parasitemia)))
+  dplyr::summarise(n_para = sum(!is.na(parasitemia)),
+                   n_NA = sum(is.na(parasitemia)),
+                   .by = c(infection, preg))
 
 #it doesn't seem like there's an interaction, but let's check it anyway
 
@@ -78,20 +77,20 @@ anova(glm_parasitemia_1, glm_parasitemia_2)
 # model diagnostic
 DHARMa::simulateResiduals(fittedModel = glm_parasitemia_1, plot = TRUE)
 
-flexplot::visualize(glm_parasitemia_1, plot = "residuals")
-
-performance::check_outliers(glm_parasitemia_1, method = "cook")
 
 # model output
 performance::model_performance(glm_parasitemia_1)
 
 summary(glm_parasitemia_1)
 
+
 # Analyse of placental pb18s relative expression ---------------------------
 
 # looking the data
-ggplot2::ggplot(
-  model_weights, aes(x = infection, y = log(pb18s), fill = infection)) +
+model_weights %>% 
+  dplyr::filter(!is.na(pb18s)) %>% 
+  ggplot2::ggplot(
+  aes(x = infection, y = log(pb18s), fill = infection)) +
   geom_boxplot(show.legend = FALSE)
 
 
@@ -115,48 +114,12 @@ glm_pb18s <- glm(pb18s ~ infection, data = model_weights,
 # model diagnostic
 DHARMa::simulateResiduals(fittedModel = glm_pb18s, plot = TRUE)
 
-performance::check_outliers(glm_pb18s, method = "cook")
-
-#outlier detected
-
-# removing outs
-model_pb18s_clean <- model_weights %>%
-  dplyr::select(mice_id, fetus_id, infection, pb18s) %>% 
-  tidyr::drop_na()
-
-
-outs_pb18s <- performance::check_outliers(glm_pb18s, method = "cook")
-
-model_pb18s_clean <- model_pb18s_clean %>%
-  dplyr::slice(-which(outs_pb18s))
-
-
-# looking the data without outs
-ggplot2::ggplot(
-  model_pb18s_clean, aes(x = infection, y = log(pb18s), fill = infection)) +
-  geom_boxplot(show.legend = FALSE)
-
-
-model_pb18s_clean %>%
-  dplyr::group_by(infection) %>%
-  dplyr::filter(infection != "pbnk65-") %>% 
-  dplyr::summarise(n_pb18s = sum(!is.na(pb18s)))
-
-
-# glm model without outs
-glm_pb18s_2 <- glm(pb18s ~ infection, data = model_pb18s_clean,
-                 family = Gamma(link = "log"))
-
-DHARMa::simulateResiduals(fittedModel = glm_pb18s_2, plot = TRUE)
-
-# saving clean data
-#saveRDS(model_pb18s_clean, "Data/Clean_data/model_pb18s_clean.rds")
-
 
 # model output
-performance::model_performance(glm_pb18s_2)
+performance::model_performance(glm_pb18s)
 
-summary(glm_pb18s_2)
+summary(glm_pb18s)
+
 
 # Analyse of infection on erithrocytes count ------------------------------
 
@@ -177,44 +140,23 @@ glm_rbc <- glm(rbc ~ infection, data = model_dams)
 # model diagnostic
 DHARMa::simulateResiduals(fittedModel = glm_rbc, plot = TRUE)
 
-flexplot::visualize(glm_rbc, plot = "residuals")
 
-performance::check_model(glm_rbc)
+#trying to adjust family and link
 
-performance::check_outliers(glm_rbc, method = "cook")
-
-#outlier detected
-
-# remove outs (replace for NA)
-model_hemato_clean <- model_dams %>% 
-  dplyr::select(mice_id, infection, rbc, hct, hgb) %>% 
-  tidyr::drop_na()
-
-outs_rbc <- performance::check_outliers(glm_rbc, method = "cook")
-
-model_hemato_clean <- model_hemato_clean %>% 
-  dplyr::mutate(rbc = if_else(outs_rbc, NA_real_, rbc))
-
-
-# Looking the data without out
-ggplot2::ggplot(model_hemato_clean,
-                aes(x= infection, y= rbc, fill= infection)) +
-  geom_boxplot(show.legend = FALSE)
-
-# glm model
-glm_rbc_1 <- glm(rbc ~ infection, data = model_hemato_clean)
+# glm model with gamma family
+glm_rbc_2 <- glm(rbc ~ infection, family = Gamma(link = "identity"),
+                 data = model_dams)
 
 # model diagnostic
-DHARMa::simulateResiduals(fittedModel = glm_rbc_1, plot = TRUE)
+DHARMa::simulateResiduals(fittedModel = glm_rbc_2, plot = TRUE)
 
-flexplot::visualize(glm_rbc_1, plot = "residuals")
-
-performance::check_model(glm_rbc_1)
+#better, gamma family improve the residuals diagnostic
 
 # model output
-performance::model_performance(glm_rbc_1)
+performance::model_performance(glm_rbc_2)
 
-summary(glm_rbc_1)
+summary(glm_rbc_2)
+
 
 # Analyse of infection on hematocrit --------------------------------------
 
@@ -222,26 +164,42 @@ summary(glm_rbc_1)
 ggplot2::ggplot(model_dams, aes(x= infection, y= hct, fill= infection)) +
   geom_boxplot(show.legend = FALSE)
 
+model_dams %>% 
+  dplyr::group_by(infection) %>% 
+  dplyr::summarise(n_obs = sum(!is.na(hct)),
+                   n_NA = sum(is.na(hct)))
+
 # glm model
 glm_hct <- glm(hct ~ infection, data = model_dams)
 
 # model diagnostic
 DHARMa::simulateResiduals(fittedModel = glm_hct, plot = TRUE)
 
-performance::check_model(glm_hct)
+# glm model with gamma family
+glm_hct_2 <- glm(hct ~ infection, family = Gamma(link = "identity"),
+                 data = model_dams)
 
-performance::check_outliers(glm_hct, method = "cook")
+# model diagnostic
+DHARMa::simulateResiduals(fittedModel = glm_hct_2, plot = TRUE)
+
+#didn't improve residuals diagnostic. keeping with gaussian glm
 
 # model output
 performance::model_performance(glm_hct)
 
 summary(glm_hct)
 
+
 # Analyse of infection on hemoglobin --------------------------------------
 
 # Looking the data
 ggplot2::ggplot(model_dams, aes(x= infection, y= hgb, fill= infection)) +
   geom_boxplot(show.legend = FALSE)
+
+model_dams %>% 
+  dplyr::group_by(infection) %>% 
+  dplyr::summarise(n_obs = sum(!is.na(hgb)),
+                   n_NA = sum(is.na(hgb)))
 
 
 # glm model
@@ -251,52 +209,20 @@ glm_hgb <- glm(hgb ~ infection, data= model_dams)
 # model diagnostic
 DHARMa::simulateResiduals(fittedModel = glm_hgb, plot = TRUE)
 
-performance::check_model(glm_hgb)
-
-performance::check_outliers(glm_hgb, method = "cook")
-
-#outlier detected
-
-# remove out (replace for NA)
-
-outs_hgb <- performance::check_outliers(glm_hgb, method = "cook")
-
-model_hemato_clean <- model_hemato_clean %>% 
-  dplyr::mutate(hgb = if_else(outs_hgb, NA_real_, hgb))
-
-
-# Looking the data without out
-ggplot2::ggplot(model_hemato_clean,
-                aes(x= infection, y= hgb, fill= infection)) +
-  geom_boxplot(show.legend = FALSE)
-
-# glm model
-glm_hgb_1 <- glm(hgb ~ infection, data = model_hemato_clean)
-
-# model diagnostic
-DHARMa::simulateResiduals(fittedModel = glm_hgb_1, plot = TRUE)
-
-flexplot::visualize(glm_hgb_1, plot = "residuals")
-
-performance::check_model(glm_hgb_1)
-
 # model output
-performance::model_performance(glm_hgb_1)
+performance::model_performance(glm_hgb)
 
-summary(glm_hgb_1)
+summary(glm_hgb)
 
-
-# saving hematology clean data
-#saveRDS(model_hemato_clean, "Data/Clean_data/model_hemato_clean.rds")
 
 # Save model outputs ------------------------------------------------------
 
 models_list <- dplyr::tibble(
   model_name = c("spleen weight", "peripheral parasitemia",
-                 "pb18s expression", "erytrocytes",
+                 "pb18s expression", "erythrocytes",
                  "hematocrite", "hemoglobin"),
-  model_output = list(glm_sw, glm_parasitemia_1, glm_pb18s_2,
-                      glm_rbc_1, glm_hct, glm_hgb_1)
+  model_output = list(glm_sw, glm_parasitemia_1, glm_pb18s,
+                      glm_rbc_2, glm_hct, glm_hgb)
 )
 
 
