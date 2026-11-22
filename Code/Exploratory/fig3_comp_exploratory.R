@@ -160,5 +160,3 @@ models_list <- dplyr::tibble(
 
 
 #saveRDS(models_list, "Code/Results/fig3_model_outputs.rds")
-#saveRDS(glm_parasitemia, "Code/Results/fig3_parasitemia_output.rds")
-
