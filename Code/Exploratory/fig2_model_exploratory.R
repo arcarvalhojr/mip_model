@@ -4,11 +4,10 @@
 # import libraries --------------------------------------------------------
 
 library(tidyverse)  # For data manipulation and visualization 
-library(lme4)       # For fitting mixed-effects models
-library(lmerTest)   # Provide p-value for mixed-effects models estimated with the lmer()
+library(lmerTest)   # For fitting mixed-effects models (with p-value)
 library(DHARMa)     # For residual diagnostics using simulated residuals
-library(flexplot)     # For visual diagnostics 
-
+library(flexplot)   # For visual diagnostics 
+library(emmeans)    # For multiple testing correction
 
 # import clean data -------------------------------------------------------
 
@@ -318,12 +317,30 @@ summary(lmm_vs_full)
 
 # Save models output ------------------------------------------------------
 
+# function to get contrasts and correct for multiple testing
+emmeans::emm_options(lmer.df = "satterthwaite")  # same as lmerTest
+
+dunnett_infection <- function(m) {
+  cont <- emmeans::contrast(emmeans::emmeans(m, ~ infection),
+                            method = "trt.vs.ctrl", ref = 1)
+  raw <- summary(cont, adjust = "none")
+  adj <- summary(cont, adjust = "dunnett")
+  
+  tibble::tibble(
+    term    = gsub("^\\(|\\)$", "", sub(" - .*", "", raw$contrast)),
+    p.value = raw$p.value,
+    q.value = adj$p.value
+  )
+}
+
+
 models_list <- dplyr::tibble(
   model_name = c("fetal weight", "placental weight", "fw/pw ratio",
                  "fgr", "fetal viability", "vascular space"),
   model_output = list(lmm_fw_full, lmm_pw_full, lmm_ratio_full,
                       glmm_fgr_full, glmm_fv_full, lmm_vs_full)
-)
+) %>% 
+  dplyr::mutate(contrasts = purrr::map(model_output, dunnett_infection))
 
 
 #saveRDS(models_list, "Code/Results/fig2_model_outputs.rds")

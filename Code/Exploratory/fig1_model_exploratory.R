@@ -6,6 +6,7 @@
 library(tidyverse)    # For data manipulation and visualization
 library(DHARMa)       # For residual diagnostics using simulated residuals
 library(performance)  # For model performance checks
+library(emmeans)      # For multiple testing correction
 
 # import clean data -------------------------------------------------------
 
@@ -217,13 +218,29 @@ summary(glm_hgb)
 
 # Save model outputs ------------------------------------------------------
 
+# function to get contrasts and correct for multiple testing
+dunnett_infection <- function(m) {
+  cont <- emmeans::contrast(emmeans::emmeans(m, ~ infection),
+                            method = "trt.vs.ctrl", ref = 1)
+  raw <- summary(cont, adjust = "none")
+  adj <- summary(cont, adjust = "dunnett")
+  
+  tibble::tibble(
+    term    = gsub("^\\(|\\)$", "", sub(" - .*", "", raw$contrast)),
+    p.value = raw$p.value,
+    q.value = adj$p.value
+  )
+}
+
+# create list with models output
 models_list <- dplyr::tibble(
   model_name = c("spleen weight", "peripheral parasitemia",
                  "pb18s expression", "erythrocytes",
                  "hematocrite", "hemoglobin"),
   model_output = list(glm_sw, glm_parasitemia_1, glm_pb18s,
                       glm_rbc_2, glm_hct, glm_hgb)
-)
+) %>% 
+  dplyr::mutate(contrasts = purrr::map(model_output, dunnett_infection))
 
 
 #saveRDS(models_list, "Code/Results/fig1_model_outputs.rds")
