@@ -3,12 +3,10 @@
 
 # Import library ----------------------------------------------------------
 
-library(tidyverse)    # For data manipulation and visualization (ggplot2, dplyr, etc.)
-library(lmerTest)   # Provide p-value for mixed-effects models estimated with the lmer()
-library(DHARMa)       # For residual diagnostics using simulated residuals
-library(performance)  # For model performance checks (R², outliers, assumptions, etc.)
-library(flexplot)     # For visual diagnostics and exploratory data analysis
-
+library(tidyverse)    # For data manipulation and visualization 
+library(lmerTest)     # Provide p-value for mixed-effects models
+library(DHARMa)       # For residual diagnostics 
+library(performance)  # For model performance checks
 
 # Import data -------------------------------------------------------------
 
@@ -188,4 +186,4 @@ model_list <- dplyr::tibble(
                       glm_gran, glm_mon, glm_ptd)
 )
 
-#saveRDS(model_list, "Code/Results/supfig2_model_outputs.rds")
+#saveRDS(model_list, "Code/Results/supfig1_model_outputs.rds")
